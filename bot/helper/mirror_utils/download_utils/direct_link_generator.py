@@ -2,7 +2,7 @@
 from threading import Thread
 from base64 import b64decode
 from json import loads
-from os import path
+from os import path as ospath
 from uuid import uuid4
 from hashlib import sha256
 from time import sleep, time
