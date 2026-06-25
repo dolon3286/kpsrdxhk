@@ -5,7 +5,7 @@ from json import loads
 from os import path
 from uuid import uuid4
 from hashlib import sha256
-from time import sleep
+from time import sleep, time
 from re import findall, match, search
 
 from requests.adapters import HTTPAdapter
