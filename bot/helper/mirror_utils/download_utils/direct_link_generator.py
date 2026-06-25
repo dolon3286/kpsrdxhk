@@ -158,7 +158,7 @@ def direct_link_generator(link):
     elif 'letsupload.io' in domain:
         return letsupload(link)
     elif 'gofile.io' in domain:
-        return gofile(link, auth)
+        return gofile(link)
     elif 'easyupload.io' in domain:
         return easyupload(link)
     elif 'streamvid.net' in domain:
@@ -672,18 +672,14 @@ def terabox(url):
 
 
 
-def gofile(url, auth):
+def gofile(url):
     try:
-        _id = url.split('/')[-1]
-        worker_base_url = "https://gofile.kpsbots.workers.dev/"
-        gofile_url = f"{worker_base_url}{_id}"
-        return gofile_url
-    except Exception as e:
-        raise e
-
-    '''    
-    try:
-        _password = sha256(auth[1].encode("utf-8")).hexdigest() if auth else ""
+        if "::" in url:
+            _password = url.split("::")[-1]
+            _password = sha256(_password.encode("utf-8")).hexdigest()
+            url = url.split("::")[-2]
+        else:
+            _password = ""
         _id = url.split("/")[-1]
     except Exception as e:
         raise DirectDownloadLinkException(f"ERROR: {e.__class__.__name__}")
@@ -705,13 +701,18 @@ def gofile(url, auth):
             raise e
 
     def __fetch_links(session, _id, folderPath=""):
-        _url = f"https://api.gofile.io/contents/{_id}?wt=4fd6sg89d7s6&cache=true"
+        _url = f"https://api.gofile.io/contents/{_id}?cache=true"
+        time_slot = int(time()) // 14400
+        raw = f"{user_agent}::en-US::{token}::{time_slot}::9844d94d963d30"
+        wt = sha256(raw.encode()).hexdigest()
         headers = {
             "User-Agent": user_agent,
             "Accept-Encoding": "gzip, deflate, br",
             "Accept": "*/*",
             "Connection": "keep-alive",
             "Authorization": "Bearer" + " " + token,
+            "X-Website-Token": wt,
+            "X-BL": "en-US",
         }
         if _password:
             _url += f"&password={_password}"
@@ -743,15 +744,15 @@ def gofile(url, auth):
                 if not content["public"]:
                     continue
                 if not folderPath:
-                    newFolderPath = path.join(details["title"], content["name"])
+                    newFolderPath = ospath.join(details["title"], content["name"])
                 else:
-                    newFolderPath = path.join(folderPath, content["name"])
+                    newFolderPath = ospath.join(folderPath, content["name"])
                 __fetch_links(session, content["id"], newFolderPath)
             else:
                 if not folderPath:
                     folderPath = details["title"]
                 item = {
-                    "path": path.join(folderPath),
+                    "path": ospath.join(folderPath),
                     "filename": content["name"],
                     "url": content["link"],
                 }
@@ -777,7 +778,6 @@ def gofile(url, auth):
     if len(details["contents"]) == 1:
         return (details["contents"][0]["url"], details["header"])
     return details
-    '''
 
 def gd_index(url, auth):
     if not auth:
