@@ -97,12 +97,12 @@ class YtSelection:
         if 'entries' in result:
             self.__is_playlist = True
             for i in ['144', '240', '360', '480', '720', '1080', '1440', '2160']:
-                # Adding fallbacks to ensure format matches gracefully
-                video_format = f'bv*[height<=?{i}][ext=mp4]+ba[ext=m4a]/bv*[height<=?{i}][ext=mp4]+ba/b[height<=?{i}]/bv*[height<=?{i}]'
+                # Bulletproof fallback chain added for playlists
+                video_format = f'bv*[height<=?{i}][ext=mp4]+ba[ext=m4a]/bv*[height<=?{i}][ext=mp4]+ba/b[height<=?{i}]/bv*[height<=?{i}]+ba/b/bv*+ba/b/best'
                 b_data = f'{i}|mp4'
                 self.formats[b_data] = video_format
                 buttons.ibutton(f'{i}-mp4', f'ytq {b_data}')
-                video_format = f'bv*[height<=?{i}][ext=webm]+ba/b[height<=?{i}]/bv*[height<=?{i}]'
+                video_format = f'bv*[height<=?{i}][ext=webm]+ba/b[height<=?{i}]/bv*[height<=?{i}]+ba/b/bv*+ba/b/best'
                 b_data = f'{i}|webm'
                 self.formats[b_data] = video_format
                 buttons.ibutton(f'{i}-webm', f'ytq {b_data}')
@@ -132,15 +132,20 @@ class YtSelection:
                             if item.get('audio_ext') == 'm4a':
                                 self.__is_m4a = True
                             b_name = f"{item.get('acodec') or format_id}-{item['ext']}"
-                            v_format = format_id
+                            v_format = f"{format_id}/ba/b"
                         elif item.get('height'):
                             height = item['height']
                             ext = item['ext']
                             fps = item['fps'] if item.get('fps') else ''
                             b_name = f'{height}p{fps}-{ext}'
-                            ba_ext = '[ext=m4a]' if self.__is_m4a and ext == 'mp4' else ''
-                            # Added fallbacks to generic audio and base formats to prevent missing format errors
-                            v_format = f'{format_id}+ba{ba_ext}/{format_id}+ba/b[height=?{height}]/{format_id}'
+                            
+                            if item.get('acodec') != 'none':
+                                # This format is already muxed (video+audio). We MUST NOT append +ba here.
+                                v_format = f'{format_id}/bv*+ba/b/best'
+                            else:
+                                # Video only format, explicitly needs audio merged
+                                ba_ext = '[ext=m4a]' if self.__is_m4a and ext == 'mp4' else ''
+                                v_format = f'{format_id}+ba{ba_ext}/{format_id}+ba/b[height=?{height}]/{format_id}/bv*+ba/b/best'
                         else:
                             continue
 
