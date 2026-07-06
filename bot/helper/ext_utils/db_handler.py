@@ -43,6 +43,7 @@ class DbManger:
                 del row['_id']
                 thumb_path = f'thumbnails/{uid}.jpg'
                 rclone_path = f'wcl/{uid}.conf'
+                token_path = f'users_tokens/{uid}.pickle'
                 if row.get('thumb'):
                     if not await aiopath.exists('thumbnails'):
                         await makedirs('thumbnails')
@@ -55,6 +56,12 @@ class DbManger:
                     async with aiopen(rclone_path, 'wb+') as f:
                         await f.write(row['rclone'])
                     row['rclone'] = rclone_path
+                if row.get('token_pickle'):
+                    if not await aiopath.exists('users_tokens'):
+                        await makedirs('users_tokens')
+                    async with aiopen(token_path, 'wb+') as f:
+                        await f.write(row['token_pickle'])
+                    row['token_pickle'] = token_path
                 user_data[uid] = row
             LOGGER.info("Users data has been imported from Database")
 
@@ -127,6 +134,13 @@ class DbManger:
                     data['rclone'] = await f.read()
             else:
                 del data['rclone']
+        if data.get('token_pickle'):
+            token_path = data['token_pickle']
+            if await aiopath.exists(token_path):
+                async with aiopen(token_path, 'rb+') as f:
+                    data['token_pickle'] = await f.read()
+            else:
+                del data['token_pickle']
         await self.__db.users[bot_id].replace_one({'_id': user_id}, data, upsert=True)
         self.__conn.close
 

@@ -279,9 +279,10 @@ async def _mirror_leech(client, message, isQbit=False, isLeech=False, sameDir=No
                 if is_cancelled:
                     await delete_links(message)
                     return
-            if drive_id and not await sync_to_async(GoogleDriveHelper().getFolderData, drive_id):
+            if drive_id and not await sync_to_async(GoogleDriveHelper(user_id=message.from_user.id).getFolderData, drive_id):
                 return await sendMessage(message, "Google Drive ID validation failed!!")
-        if up == 'gd' and not config_dict['GDRIVE_ID'] and not drive_id:
+        user_token_drive = user_data.get(message.from_user.id, {}).get('user_token_drive', '') if user_data.get(message.from_user.id, {}).get('token_mode') else ''
+        if up == 'gd' and not config_dict['GDRIVE_ID'] and not drive_id and not user_token_drive:
             await sendMessage(message, 'GDRIVE_ID not Provided!')
             return
         elif not up:

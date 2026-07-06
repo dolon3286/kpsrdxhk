@@ -13,7 +13,7 @@ from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type, RetryError
 
-from bot import OWNER_ID, config_dict, list_drives_dict, GLOBAL_EXTENSION_FILTER
+from bot import OWNER_ID, config_dict, list_drives_dict, GLOBAL_EXTENSION_FILTER, user_data
 from bot.helper.ext_utils.bot_utils import setInterval, async_to_sync, get_readable_file_size, fetch_user_tds
 from bot.helper.ext_utils.fs_utils import get_mime_type
 from bot.helper.ext_utils.leech_utils import format_filename
@@ -24,13 +24,14 @@ getLogger('googleapiclient.discovery').setLevel(ERROR)
 
 class GoogleDriveHelper:
 
-    def __init__(self, name=None, path=None, listener=None):
+    def __init__(self, name=None, path=None, listener=None, user_id=None, token_path=None):
         self.__OAUTH_SCOPE = ['https://www.googleapis.com/auth/drive']
         self.__G_DRIVE_DIR_MIME_TYPE = "application/vnd.google-apps.folder"
         self.__G_DRIVE_BASE_DOWNLOAD_URL = "https://drive.google.com/uc?id={}&export=download"
         self.__G_DRIVE_DIR_BASE_DOWNLOAD_URL = "https://drive.google.com/drive/folders/{}"
         self.__listener = listener
-        self.__user_id = listener.message.from_user.id if listener else None
+        self.__user_id = listener.message.from_user.id if listener else user_id
+        self.__token_path = token_path
         self.__path = path
         self.__total_bytes = 0
         self.__total_files = 0
@@ -68,7 +69,12 @@ class GoogleDriveHelper:
 
     def __authorize(self):
         credentials = None
-        if config_dict['USE_SERVICE_ACCOUNTS']:
+        user_token_path = self.__token_path or (f'users_tokens/{self.__user_id}.pickle' if self.__user_id and user_data.get(self.__user_id, {}).get('token_mode') else None)
+        if user_token_path and ospath.exists(user_token_path):
+            LOGGER.info(f"Authorize with user token.pickle for {self.__user_id}")
+            with open(user_token_path, 'rb') as f:
+                credentials = pload(f)
+        elif config_dict['USE_SERVICE_ACCOUNTS']:
             json_files = listdir("accounts")
             self.__sa_number = len(json_files)
             self.__sa_index = randrange(self.__sa_number)
@@ -218,6 +224,8 @@ class GoogleDriveHelper:
         return msg
 
     def upload(self, file_name, size, gdrive_id):
+        if not gdrive_id and self.__user_id and user_data.get(self.__user_id, {}).get('token_mode'):
+            gdrive_id = user_data.get(self.__user_id, {}).get('user_token_drive', '')
         if not gdrive_id:
             gdrive_id = config_dict['GDRIVE_ID']
         self.__is_uploading = True
@@ -364,7 +372,7 @@ class GoogleDriveHelper:
                         'dailyLimitExceeded',
                     ]:
                         raise err
-                    if config_dict['USE_SERVICE_ACCOUNTS']:
+                    if config_dict['USE_SERVICE_ACCOUNTS'] and not user_data.get(self.__user_id, {}).get('token_mode'):
                         if self.__sa_count >= self.__sa_number:
                             LOGGER.info(
                                 f"Reached maximum number of service accounts switching, which is {self.__sa_count}")
@@ -397,6 +405,8 @@ class GoogleDriveHelper:
         return
 
     def clone(self, link, gdrive_id):
+        if not gdrive_id and self.__user_id and user_data.get(self.__user_id, {}).get('token_mode'):
+            gdrive_id = user_data.get(self.__user_id, {}).get('user_token_drive', '')
         if not gdrive_id:
             gdrive_id = config_dict['GDRIVE_ID']
         self.__is_cloning = True
@@ -825,7 +835,7 @@ class GoogleDriveHelper:
                         'dailyLimitExceeded',
                     ]:
                         raise err
-                    if config_dict['USE_SERVICE_ACCOUNTS']:
+                    if config_dict['USE_SERVICE_ACCOUNTS'] and not user_data.get(self.__user_id, {}).get('token_mode'):
                         if self.__sa_count >= self.__sa_number:
                             LOGGER.info(
                                 f"Reached maximum number of service accounts switching, which is {self.__sa_count}")
