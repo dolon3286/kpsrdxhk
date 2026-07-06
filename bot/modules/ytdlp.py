@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from pyrogram.filters import command, regex, user
 from asyncio import sleep, wait_for, Event, wrap_future
@@ -7,12 +8,13 @@ from aiofiles.os import path as aiopath
 from yt_dlp import YoutubeDL
 from functools import partial
 from time import time
+from ast import literal_eval
 
 from bot import DOWNLOAD_DIR, bot, categories_dict, config_dict, user_data, LOGGER
 from bot.helper.ext_utils.task_manager import task_utils
 from bot.helper.telegram_helper.message_utils import sendMessage, editMessage, deleteMessage, auto_delete_message, delete_links, open_category_btns, open_dump_btns
 from bot.helper.telegram_helper.button_build import ButtonMaker
-from bot.helper.ext_utils.bot_utils import get_readable_file_size, fetch_user_tds, fetch_user_dumps, is_url, is_gdrive_link, new_task, sync_to_async, new_task, is_rclone_path, new_thread, get_readable_time, arg_parser
+from bot.helper.ext_utils.bot_utils import get_readable_file_size, fetch_user_tds, fetch_user_dumps, is_url, is_gdrive_link, new_task, sync_to_async, is_rclone_path, new_thread, get_readable_time, arg_parser
 from bot.helper.mirror_utils.download_utils.yt_dlp_download import YoutubeDLHelper
 from bot.helper.mirror_utils.rclone_utils.list import RcloneList
 from bot.helper.telegram_helper.bot_commands import BotCommands
@@ -124,10 +126,11 @@ class YtSelection:
                         else:
                             size = 0
 
-                        if item.get('video_ext') == 'none' and item.get('acodec') != 'none':
+                        # Custom Format logic injection
+                        if item.get('video_ext') == 'none' and (item.get('resolution') == 'audio only' or item.get('acodec') != 'none'):
                             if item.get('audio_ext') == 'm4a':
                                 self.__is_m4a = True
-                            b_name = f"{item['acodec']}-{item['ext']}"
+                            b_name = f"{item.get('acodec') or format_id}-{item['ext']}"
                             v_format = format_id
                         elif item.get('height'):
                             height = item['height']
@@ -244,6 +247,8 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
     text = message.text.split('\n')
     input_list = text[0].split(' ')
     qual = ''
+    
+    # Custom Features Injected: Extended arg_base logic
     arg_base = {'link': '', 
                 '-i': 0, 
                 '-m': '', '-sd': '', '-samedir': '',
@@ -260,10 +265,30 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
                 '-ud': '', '-dump': '',
                 '-ss': '0', '-screenshots': '',
                 '-t': '', '-thumb': '',
-    }
+                # Expanded custom args below
+                '-doc': False,
+                '-med': False,
+                '-sv': False,
+                '-f': False,
+                '-fd': False,
+                '-fu': False,
+                '-hl': False,
+                '-bt': False,
+                '-ut': False,
+                '-sp': 0,
+                '-meta': '',
+                '-ca': '',
+                '-cv': '',
+                '-ns': '',
+                '-tl': '',
+                '-ff': ''}
 
     args = arg_parser(input_list[1:], arg_base)
     cmd = input_list[0].split('@')[0]
+
+    if config_dict.get('DISABLE_FF_MODE') and args.get('-ff'):
+        await sendMessage(message, "FFmpeg commands are currently disabled.")
+        return
 
     try:
         multi = int(args['-i'])
@@ -361,7 +386,7 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
 
     user_dict = user_data.get(user_id, {})
 
-    opt = opt or user_dict.get('yt_opt') or config_dict['YT_DLP_OPTIONS']
+    opt = opt or user_dict.get('yt_opt') or config_dict.get('YT_DLP_OPTIONS', '')
     
     if username := message.from_user.username:
         tag = f'@{username}'
@@ -466,11 +491,44 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
 
     listener = MirrorLeechListener(message, compress, isLeech=isLeech, tag=tag, sameDir=sameDir, rcFlags=rcf, upPath=up, drive_id=drive_id, index_link=index_link, isYtdlp=True, source_url=link, leech_utils={'screenshots': sshots, 'thumb': thumb})
 
+    # Injected extra custom properties onto listener
+    listener.as_doc = args['-doc']
+    listener.as_med = args['-med']
+    listener.sample_video = args['-sv']
+    listener.force_run = args['-f']
+    listener.force_download = args['-fd']
+    listener.force_upload = args['-fu']
+    listener.hybrid_leech = args['-hl']
+    listener.bot_trans = args['-bt']
+    listener.user_trans = args['-ut']
+    listener.split_size = args['-sp']
+    listener.metadata = args['-meta']
+    listener.convert_audio = args['-ca']
+    listener.convert_video = args['-cv']
+    listener.name_swap = args['-ns']
+    listener.thumbnail_layout = args['-tl']
+    
+    try:
+        if args.get('-ff'):
+            listener.ffmpeg_cmds = literal_eval(args['-ff'])
+        else:
+            listener.ffmpeg_cmds = None
+    except:
+        listener.ffmpeg_cmds = None
 
     if 'mdisk.me' in link:
         name, link = await _mdisk(link, name)
 
-    options = {'usenetrc': True, 'cookiefile': 'cookies.txt'}
+    # User Cookie implementation applied dynamically to options
+    cookie_to_use = (
+        usr_cookie
+        if not user_dict.get("USE_DEFAULT_COOKIE", False)
+        and (usr_cookie := user_dict.get("USER_COOKIE_FILE", ""))
+        and os.path.exists(usr_cookie)
+        else "cookies.txt"
+    )
+    
+    options = {'usenetrc': True, 'cookiefile': cookie_to_use}
     if opt:
         yt_opt = opt.split('|')
         for ytopt in yt_opt:
@@ -521,12 +579,17 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
     await ydl.add_download(link, path, name, qual, playlist, opt)
     
 
-
 async def ytdl(client, message):
+    if config_dict.get('DISABLE_YTDLP'):
+        await sendMessage(message, "YT-DLP downloads are currently disabled by the Bot Owner.")
+        return
     _ytdl(client, message)
 
 
 async def ytdlleech(client, message):
+    if config_dict.get('DISABLE_YTDLP'):
+        await sendMessage(message, "YT-DLP downloads are currently disabled by the Bot Owner.")
+        return
     _ytdl(client, message, isLeech=True)
 
 
