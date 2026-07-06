@@ -65,7 +65,6 @@ class YtSelection:
         self.__message = message
         self.__user_id = message.from_user.id
         self.__client = client
-        self.__is_m4a = False
         self.__reply_to = None
         self.__time = time()
         self.__timeout = 120
@@ -97,12 +96,12 @@ class YtSelection:
         if 'entries' in result:
             self.__is_playlist = True
             for i in ['144', '240', '360', '480', '720', '1080', '1440', '2160']:
-                # Bulletproof fallback chain added for playlists
-                video_format = f'bv*[height<=?{i}][ext=mp4]+ba[ext=m4a]/bv*[height<=?{i}][ext=mp4]+ba/b[height<=?{i}]/bv*[height<=?{i}]+ba/b/bv*+ba/b/best'
+                # Foolproof playlist formats with guaranteed fallbacks
+                video_format = f'bv*[height<={i}][ext=mp4]+ba[ext=m4a]/bv*[height<={i}]+ba/b[height<={i}]/bv*+ba/b'
                 b_data = f'{i}|mp4'
                 self.formats[b_data] = video_format
                 buttons.ibutton(f'{i}-mp4', f'ytq {b_data}')
-                video_format = f'bv*[height<=?{i}][ext=webm]+ba/b[height<=?{i}]/bv*[height<=?{i}]+ba/b/bv*+ba/b/best'
+                video_format = f'bv*[height<={i}][ext=webm]+ba/b[height<={i}]/bv*[height<={i}]+ba/bv*+ba/b'
                 b_data = f'{i}|webm'
                 self.formats[b_data] = video_format
                 buttons.ibutton(f'{i}-webm', f'ytq {b_data}')
@@ -127,10 +126,8 @@ class YtSelection:
                         else:
                             size = 0
 
-                        # Custom Format logic injection
+                        # Bulletproof format string generation without complex ext matching
                         if item.get('video_ext') == 'none' and (item.get('resolution') == 'audio only' or item.get('acodec') != 'none'):
-                            if item.get('audio_ext') == 'm4a':
-                                self.__is_m4a = True
                             b_name = f"{item.get('acodec') or format_id}-{item['ext']}"
                             v_format = f"{format_id}/ba/b"
                         elif item.get('height'):
@@ -140,12 +137,11 @@ class YtSelection:
                             b_name = f'{height}p{fps}-{ext}'
                             
                             if item.get('acodec') != 'none':
-                                # This format is already muxed (video+audio). We MUST NOT append +ba here.
-                                v_format = f'{format_id}/bv*+ba/b/best'
+                                # This format is already muxed (video+audio).
+                                v_format = f'{format_id}/bv*+ba/b'
                             else:
-                                # Video only format, explicitly needs audio merged
-                                ba_ext = '[ext=m4a]' if self.__is_m4a and ext == 'mp4' else ''
-                                v_format = f'{format_id}+ba{ba_ext}/{format_id}+ba/b[height=?{height}]/{format_id}/bv*+ba/b/best'
+                                # Video only format, explicitly needs any audio merged, with fail-safe fallbacks
+                                v_format = f'{format_id}+ba/bv*+ba/b'
                         else:
                             continue
 
