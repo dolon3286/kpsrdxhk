@@ -97,11 +97,12 @@ class YtSelection:
         if 'entries' in result:
             self.__is_playlist = True
             for i in ['144', '240', '360', '480', '720', '1080', '1440', '2160']:
-                video_format = f'bv*[height<=?{i}][ext=mp4]+ba[ext=m4a]/b[height<=?{i}]'
+                # Adding fallbacks to ensure format matches gracefully
+                video_format = f'bv*[height<=?{i}][ext=mp4]+ba[ext=m4a]/bv*[height<=?{i}][ext=mp4]+ba/b[height<=?{i}]/bv*[height<=?{i}]'
                 b_data = f'{i}|mp4'
                 self.formats[b_data] = video_format
                 buttons.ibutton(f'{i}-mp4', f'ytq {b_data}')
-                video_format = f'bv*[height<=?{i}][ext=webm]+ba/b[height<=?{i}]'
+                video_format = f'bv*[height<=?{i}][ext=webm]+ba/b[height<=?{i}]/bv*[height<=?{i}]'
                 b_data = f'{i}|webm'
                 self.formats[b_data] = video_format
                 buttons.ibutton(f'{i}-webm', f'ytq {b_data}')
@@ -138,7 +139,8 @@ class YtSelection:
                             fps = item['fps'] if item.get('fps') else ''
                             b_name = f'{height}p{fps}-{ext}'
                             ba_ext = '[ext=m4a]' if self.__is_m4a and ext == 'mp4' else ''
-                            v_format = f'{format_id}+ba{ba_ext}/b[height=?{height}]'
+                            # Added fallbacks to generic audio and base formats to prevent missing format errors
+                            v_format = f'{format_id}+ba{ba_ext}/{format_id}+ba/b[height=?{height}]/{format_id}'
                         else:
                             continue
 
@@ -536,9 +538,11 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
             if key == 'format':
                 if select:
                     qual = ''
-                elif value.startswith('ba/b-'):
+                else:
                     qual = value
-                    continue
+                # Skip adding strictly defined format to 'options' object during extraction
+                # to prevent extraction errors if formats are missing. We will pass qual to the downloader instead.
+                continue
             if value.startswith('^'):
                 if '.' in value or value == '^inf':
                     value = float(value.split('^')[1])
