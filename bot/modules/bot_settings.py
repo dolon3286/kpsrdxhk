@@ -730,16 +730,19 @@ async def get_buttons(key=None, edit_type=None, edit_mode=None, mess=None):
             buttons.ibutton(f'{int(x/10)+1}', f"botset start var {x}", position='footer')
         msg = f'<b>Config Variables</b> | <b>Page: {int(START/10)+1}</b>'
     elif key == 'private':
-        buttons.ibutton('Back', "botset back")
-        buttons.ibutton('Close', "botset close")
-        msg = '''<u>Send any of these private files:</u>
-        
-<code>config.env, token.pickle, accounts.zip, list_drives.txt, categories.txt, shorteners.txt, cookies.txt, terabox.txt, .netrc or any other file!</code>
-
-<i>To delete private file send only the file name as text message with or without extension.</i>
-<b>NOTE:</b> Changing .netrc will not take effect for aria2c until restart.
-
-<b>Timeout:</b> 60 sec'''
+        buttons.ibutton('Create New File', "botset private", "footer")
+        buttons.ibutton('Add/Delete File', "botset private", "footer")
+        buttons.ibutton('Back', "botset back", "footer")
+        buttons.ibutton('Close', "botset close", "footer")
+        private_files = ['config.env', 'token.pickle', 'rclone.conf', 'accounts.zip', 'list_drives.txt',
+                         'shorteners.txt', 'categories.txt', 'cookies.txt', '.netrc']
+        msg = '<b>Private File Settings</b>\n┎<b>Dashboard :</b>\n\n'
+        for file_name in private_files:
+            exists = await aiopath.exists(file_name)
+            msg += f"┣<code>{file_name}</code> --> <b>{'Exists' if exists else 'Not Exists'}</b>\n"
+        msg += "\n┣<b>Delete File</b> --> Send the file name as text message, Like <code>rclone.conf</code>.\n\n"
+        msg += "┖<b>Note:</b> Changing .netrc will not take effect for aria2c until restart.\n\n"
+        msg += "<u>Send any private file:</u> <code>config.env, token.pickle, accounts.zip, list_drives.txt, categories.txt, shorteners.txt, cookies.txt, terabox.txt, .netrc or any other file!</code>\n\n<b>Timeout:</b> 60 sec"
     elif key == 'aria':
         for k in list(aria2_options.keys())[START:10+START]:
             buttons.ibutton(k, f"botset editaria {k}")

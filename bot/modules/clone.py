@@ -7,7 +7,7 @@ from aiofiles.os import path as aiopath
 from cloudscraper import create_scraper as cget
 from json import loads, dumps as jdumps
 
-from bot import LOGGER, download_dict, download_dict_lock, categories_dict, config_dict, bot
+from bot import LOGGER, download_dict, download_dict_lock, categories_dict, config_dict, bot, user_data
 from bot.helper.ext_utils.task_manager import limit_checker, task_utils
 from bot.helper.mirror_utils.upload_utils.gdriveTools import GoogleDriveHelper
 from bot.helper.telegram_helper.message_utils import sendMessage, editMessage, deleteMessage, sendStatusMessage, delete_links, auto_delete_message, open_category_btns
@@ -278,9 +278,10 @@ async def clone(client, message):
             if is_cancelled:
                 await delete_links(message)
                 return
-        if drive_id and not await sync_to_async(GoogleDriveHelper().getFolderData, drive_id):
+        if drive_id and not await sync_to_async(GoogleDriveHelper(user_id=message.from_user.id).getFolderData, drive_id):
             return await sendMessage(message, "Google Drive ID validation failed!!")
-        if not config_dict['GDRIVE_ID'] and not drive_id:
+        user_token_drive = user_data.get(message.from_user.id, {}).get('user_token_drive', '') if user_data.get(message.from_user.id, {}).get('token_mode') else ''
+        if not config_dict['GDRIVE_ID'] and not drive_id and not user_token_drive:
             await sendMessage(message, 'GDRIVE_ID not Provided!')
             await delete_links(message)
             return

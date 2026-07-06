@@ -42,6 +42,8 @@ desp_dict = {'rcc': ['RClone is a command-line program to sync files and directo
             'usess': [f'User Session is Telegram Session used to Download Private Contents from Private Channels with no compromise in Privacy, Build with Encryption.\n{"<b>Warning:</b> This Bot is not secured. We recommend asking the group owner to set the Upstream repo to the Official repo. If it is not the official repo, then KPSML-X is not responsible for any issues that may occur in your account." if config_dict["UPSTREAM_REPO"] != "https://github.com/Tamilupdates/KPSML-X" else "Bot is Secure. You can use the session securely."}', 'Send your Session String.\n<b>Timeout:</b> 60 sec'],
             'split_size': ['Leech Splits Size is the size to split the Leeched File before uploading', f'Send Leech split size in any comfortable size, like 2Gb, 500MB or 1.46gB. \n<b>PREMIUM ACTIVE:</b> {IS_PREMIUM_USER}. \n<b>Timeout:</b> 60 sec'],
             'ddl_servers': ['DDL Servers which uploads your File to their Specific Hosting', ''],
+            'token_pickle': ['Upload with your own Google Drive token.pickle and default Drive ID. Enable Token Swap to use it instead of owner/bot token.', 'Send token.pickle file.\n<b>Timeout:</b> 60 sec'],
+            'user_token_drive': ['Default Google Drive folder/team drive ID used with your token.pickle.', 'Send Drive ID or Google Drive folder link.\n<b>Timeout:</b> 60 sec'],
             'user_tds': [f'UserTD helps to Upload files via Bot to your Custom Drive Destination via Global SA mail\n\n➲ <b>SA Mail :</b> {"Not Specified" if "USER_TD_SA" not in config_dict else config_dict["USER_TD_SA"]}', 'Send User TD details for Use while Mirror/Clone\n➲ <b>Format:</b>\nname id/link index(optional)\nname2 link2/id2 index(optional)\n\n<b>NOTE:</b>\n<i>1. Drive ID must be valid, then only it will accept\n2. Names can have spaces\n3. All UserTDs are updated on every change\n4. To delete specific UserTD, give Name(s) separated by each line</i>\n\n<b>Timeout:</b> 60 sec'],
             'gofile': ['Gofile is a free file sharing and storage platform. You can store and share your content without any limit.', "Send GoFile's API Key. Get it on https://gofile.io/myProfile, It will not be Accepted if the API Key is Invalid !!\n<b>Timeout:</b> 60 sec"],
             'streamtape': ['Streamtape is free Video Streaming & sharing Hoster', "Send StreamTape's Login and Key\n<b>Format:</b> <code>user_login:pass_key</code>\n<b>Timeout:</b> 60 sec"],
@@ -62,6 +64,8 @@ fname_dict = {'rcc': 'RClone',
              'usess': 'User Session',
              'split_size': 'Leech Splits',
              'ddl_servers': 'DDL Servers',
+             'token_pickle': 'Token.pickle',
+             'user_token_drive': 'Token Drive ID',
              'user_tds': 'User Custom TDs',
              'gofile': 'GoFile',
              'streamtape': 'StreamTape',
@@ -73,6 +77,7 @@ async def get_user_settings(from_user, key=None, edit_type=None, edit_mode=None)
     buttons = ButtonMaker()
     thumbpath = f"Thumbnails/{user_id}.jpg"
     rclone_path = f'wcl/{user_id}.conf'
+    token_path = f'users_tokens/{user_id}.pickle'
     user_dict = user_data.get(user_id, {})
     if key is None:
         buttons.ibutton("Universal Settings", f"userset {user_id} universal")
@@ -90,6 +95,12 @@ async def get_user_settings(from_user, key=None, edit_type=None, edit_mode=None)
         buttons.ibutton(f"{'✅️' if ytopt != 'Not Exists' else ''} YT-DLP Options", f"userset {user_id} yt_opt")
         u_sess = 'Exists' if user_dict.get('usess', False) else 'Not Exists'
         buttons.ibutton(f"{'✅️' if u_sess != 'Not Exists' else ''} User Session", f"userset {user_id} usess")
+        token_msg = 'Exists' if await aiopath.exists(token_path) else 'Not Exists'
+        token_mode = 'User' if user_dict.get('token_mode', False) else 'Owner'
+        token_drive = 'Not Exists' if (val:=user_dict.get('user_token_drive', '')) == '' else val
+        buttons.ibutton(f"{'✅️' if token_msg == 'Exists' else ''} Token.pickle", f"userset {user_id} token_pickle")
+        buttons.ibutton(f"{'✅️' if token_drive != 'Not Exists' else ''} Token Drive ID", f"userset {user_id} user_token_drive")
+        buttons.ibutton('Use Owner Token' if token_mode == 'User' else 'Use User Token', f"userset {user_id} token_mode")
         bot_pm = "Enabled" if user_dict.get('bot_pm', config_dict['BOT_PM']) else "Disabled"
         buttons.ibutton('Disable Bot PM' if bot_pm == 'Enabled' else 'Enable Bot PM', f"userset {user_id} bot_pm")
         if config_dict['BOT_PM']:
@@ -108,6 +119,9 @@ async def get_user_settings(from_user, key=None, edit_type=None, edit_mode=None)
         else: lastused = "Bot Not Used yet.."
 
         text = BotTheme('UNIVERSAL', NAME=name, YT=escape(ytopt), DT=f"{dailytas} / {dailytl}", LAST_USED=lastused, BOT_PM=bot_pm, MEDIAINFO=mediainfo, SAVE_MODE=save_mode, USESS=u_sess)
+        text += f"\n➲ <b>Token.pickle :</b> <i>{token_msg}</i>"
+        text += f"\n➲ <b>Token Mode :</b> <i>{token_mode}</i>"
+        text += f"\n➲ <b>Token Drive ID :</b> <code>{escape(token_drive)}</code>"
         buttons.ibutton("Back", f"userset {user_id} back", "footer")
         buttons.ibutton("Close", f"userset {user_id} close", "footer")
         button = buttons.build_menu(2)
@@ -218,6 +232,12 @@ async def get_user_settings(from_user, key=None, edit_type=None, edit_mode=None)
         elif key == 'yt_opt':
             set_exist = 'Not Exists' if (val:=user_dict.get('yt_opt', config_dict.get('YT_DLP_OPTIONS', ''))) == '' else val
             text += f"➲ <b>YT-DLP Options :</b> <code>{escape(set_exist)}</code>\n\n"
+        elif key == 'token_pickle':
+            set_exist = 'Exists' if await aiopath.exists(token_path) else 'Not Exists'
+            text += f"➲ <b>{fname_dict[key]} :</b> <code>{set_exist}</code>\n\n"
+        elif key == 'user_token_drive':
+            set_exist = 'Not Exists' if (val:=user_dict.get(key, '')) == '' else val
+            text += f"➲ <b>{fname_dict[key]} :</b> <code>{escape(set_exist)}</code>\n\n"
         elif key == 'usess':
             set_exist = 'Exists' if user_dict.get('usess') else 'Not Exists'
             text += f"➲ <b>{fname_dict[key]} :</b> <code>{set_exist}</code>\n➲ <b>Encryption :</b> {'🔐' if set_exist else '🔓'}\n\n"
@@ -325,7 +345,13 @@ async def set_custom(client, message, pre_event, key, direct=False):
     return_key = 'leech'
     n_key = key
     user_dict = user_data.get(user_id, {})
-    if key in ['gofile', 'streamtape']:
+    if key == 'user_token_drive':
+        if is_gdrive_link(value):
+            value = GoogleDriveHelper.getIdFromUrl(value)
+        if not await sync_to_async(GoogleDriveHelper(user_id=user_id, token_path=f'users_tokens/{user_id}.pickle').getFolderData, value):
+            value = ''
+        return_key = 'universal'
+    elif key in ['gofile', 'streamtape']:
         ddl_dict = user_dict.get('ddl_servers', {})
         mode, api = ddl_dict.get(key, [False, ""])
         if key == "gofile" and not await Gofile.is_goapi(value):
@@ -401,6 +427,21 @@ async def set_thumb(client, message, pre_event, key, direct=False):
         await DbManger().update_user_doc(user_id, 'thumb', des_dir)
 
 
+async def add_token_pickle(client, message, pre_event):
+    user_id = message.from_user.id
+    handler_dict[user_id] = False
+    path = f'{getcwd()}/users_tokens/'
+    if not await aiopath.isdir(path):
+        await mkdir(path)
+    des_dir = ospath.join(path, f'{user_id}.pickle')
+    await message.download(file_name=des_dir)
+    update_user_ldata(user_id, 'token_pickle', f'users_tokens/{user_id}.pickle')
+    await deleteMessage(message)
+    await update_user_settings(pre_event, 'token_pickle', 'universal')
+    if DATABASE_URL:
+        await DbManger().update_user_doc(user_id, 'token_pickle', des_dir)
+
+
 async def add_rclone(client, message, pre_event):
     user_id = message.from_user.id
     handler_dict[user_id] = False
@@ -465,6 +506,7 @@ async def edit_user_settings(client, query):
     data = query.data.split()
     thumb_path = f'Thumbnails/{user_id}.jpg'
     rclone_path = f'wcl/{user_id}.conf'
+    token_path = f'users_tokens/{user_id}.pickle'
     user_dict = user_data.get(user_id, {})
     if user_id != int(data[1]):
         await query.answer("Not Yours!", show_alert=True)
@@ -518,6 +560,22 @@ async def edit_user_settings(client, query):
         pfunc = partial(set_thumb, pre_event=query, key=data[2])
         rfunc = partial(update_user_settings, query, data[2], 'leech')
         await event_handler(client, query, pfunc, rfunc, True)
+    elif data[2] == 'token_pickle':
+        await query.answer()
+        edit_mode = len(data) == 4
+        await update_user_settings(query, data[2], 'universal', edit_mode)
+        if not edit_mode: return
+        pfunc = partial(add_token_pickle, pre_event=query)
+        rfunc = partial(update_user_settings, query, data[2], 'universal')
+        await event_handler(client, query, pfunc, rfunc, document=True)
+    elif data[2] == 'user_token_drive':
+        await query.answer()
+        edit_mode = len(data) == 4
+        await update_user_settings(query, data[2], 'universal', edit_mode)
+        if not edit_mode: return
+        pfunc = partial(set_custom, pre_event=query, key=data[2])
+        rfunc = partial(update_user_settings, query, data[2], 'universal')
+        await event_handler(client, query, pfunc, rfunc)
     elif data[2] in ['yt_opt', 'usess']:
         await query.answer()
         edit_mode = len(data) == 4
@@ -526,11 +584,31 @@ async def edit_user_settings(client, query):
         pfunc = partial(set_custom, pre_event=query, key=data[2])
         rfunc = partial(update_user_settings, query, data[2], 'universal')
         await event_handler(client, query, pfunc, rfunc)
-    elif data[2] in ['dyt_opt', 'dusess']:
+    elif data[2] == 'dtoken_pickle':
+        handler_dict[user_id] = False
+        if await aiopath.exists(token_path):
+            await aioremove(token_path)
+        await query.answer()
+        update_user_ldata(user_id, 'token_pickle', '')
+        update_user_ldata(user_id, 'token_mode', False)
+        await update_user_settings(query, 'token_pickle', 'universal')
+        if DATABASE_URL:
+            await DbManger().update_user_doc(user_id, 'token_pickle')
+            await DbManger().update_user_data(user_id)
+    elif data[2] in ['dyt_opt', 'dusess', 'duser_token_drive']:
         handler_dict[user_id] = False
         await query.answer()
         update_user_ldata(user_id, data[2][1:], '')
         await update_user_settings(query, data[2][1:], 'universal')
+        if DATABASE_URL:
+            await DbManger().update_user_data(user_id)
+    elif data[2] == 'token_mode':
+        handler_dict[user_id] = False
+        if not await aiopath.exists(token_path):
+            return await query.answer('Upload token.pickle first!', show_alert=True)
+        await query.answer()
+        update_user_ldata(user_id, 'token_mode', not user_dict.get('token_mode', False))
+        await update_user_settings(query, 'universal')
         if DATABASE_URL:
             await DbManger().update_user_data(user_id)
     elif data[2] in ['bot_pm', 'mediainfo', 'save_mode', 'td_mode']:
@@ -671,6 +749,8 @@ async def edit_user_settings(client, query):
             await aioremove(thumb_path)
         if await aiopath.exists(rclone_path):
             await aioremove(rclone_path)
+        if await aiopath.exists(token_path):
+            await aioremove(token_path)
         await query.answer()
         update_user_ldata(user_id, None, None)
         await update_user_settings(query)
@@ -678,20 +758,25 @@ async def edit_user_settings(client, query):
             await DbManger().update_user_data(user_id)
             await DbManger().update_user_doc(user_id, 'thumb')
             await DbManger().update_user_doc(user_id, 'rclone')
+            await DbManger().update_user_doc(user_id, 'token_pickle')
     elif data[2] == 'user_del':
         user_id = int(data[3])
         await query.answer()
         thumb_path = f'Thumbnails/{user_id}.jpg'
         rclone_path = f'wcl/{user_id}.conf'
+        token_path = f'users_tokens/{user_id}.pickle'
         if await aiopath.exists(thumb_path):
             await aioremove(thumb_path)
         if await aiopath.exists(rclone_path):
             await aioremove(rclone_path)
+        if await aiopath.exists(token_path):
+            await aioremove(token_path)
         update_user_ldata(user_id, None, None)
         if DATABASE_URL:
             await DbManger().update_user_data(user_id)
             await DbManger().update_user_doc(user_id, 'thumb')
             await DbManger().update_user_doc(user_id, 'rclone')
+            await DbManger().update_user_doc(user_id, 'token_pickle')
         await editMessage(message, f'Data Reset for {user_id}')
     else:
         handler_dict[user_id] = False
