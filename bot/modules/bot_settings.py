@@ -497,21 +497,6 @@ async def load_config():
     if len(FILELION_API) == 0:
         FILELION_API = ''
 
-    DEF_IMDB_TEMP  = environ.get('IMDB_TEMPLATE', '')
-    if len(DEF_IMDB_TEMP) == 0:
-        DEF_IMDB_TEMP = '''<b>Title: </b> {title} [{year}]
-<b>Also Known As:</b> {aka}
-<b>Rating ⭐️:</b> <i>{rating}</i>
-<b>Release Info: </b> <a href="{url_releaseinfo}">{release_date}</a>
-<b>Genre: </b>{genres}
-<b>IMDb URL:</b> {url}
-<b>Language: </b>{languages}
-<b>Country of Origin : </b> {countries}
-
-<b>Story Line: </b><code>{plot}</code>
-
-<a href="{url_cast}">Read More ...</a>'''
-
     DEF_ANI_TEMP  = environ.get('ANIME_TEMPLATE', '')
     if len(DEF_ANI_TEMP) == 0:
         DEF_ANI_TEMP = '''<b>{ro_title}</b>({na_title})
@@ -636,7 +621,6 @@ async def load_config():
                         'IMAGES': IMAGES,
                         'IMG_SEARCH': IMG_SEARCH,
                         'IMG_PAGE': IMG_PAGE,
-                        'IMDB_TEMPLATE': DEF_IMDB_TEMP,
                         'AUTHOR_NAME': AUTHOR_NAME,
                         'AUTHOR_URL': AUTHOR_URL,
                         'COVER_IMAGE': COVER_IMAGE,

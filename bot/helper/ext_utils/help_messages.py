@@ -413,7 +413,6 @@ f'''⌬ <b><i>Miscellaneous Commands!</i></b>
 ┖ /{BotCommands.SearchCommand} [query]: Search for torrents with API.
 
 <b>Movie/TV Shows/Drama Search:</b>
-┠ /{BotCommands.IMDBCommand}: Search in IMDB.
 ┠ /{BotCommands.AniListCommand}: Search for anime in AniList.
 ┠ /{BotCommands.AnimeHelpCommand}: Anime help guide.
 ┖ /{BotCommands.MyDramaListCommand}: Search in MyDramaList.
@@ -446,7 +445,6 @@ default_desp = {'AS_DOCUMENT': 'Default type of Telegram file upload. Default is
                 'IMAGES': 'Add multiple telgraph(graph.org) image links that are seperated by spaces.',
                 'IMG_SEARCH': 'Put Keyword to Download Images. Sperarte each name by , like anime, iron man, god of war',
                 'IMG_PAGE': 'Set the page value for downloading a image. Each page have approx 70 images. Deafult is 1. Int',
-                'IMDB_TEMPLATE': 'Set Bot Default IMDB Template. HTML Tags, Emojis supported. str',
                 'AUTHOR_NAME': 'Author name for Telegraph pages, Shown in Telegraph Page as by AUTHOR_NAME',
                 'AUTHOR_URL': 'Author URL for Telegraph page, Put Channel URL to Show Join Channel. Str',
                 'COVER_IMAGE': 'Cover Image for Telegraph Page. Put Telegraph Photo Link',
