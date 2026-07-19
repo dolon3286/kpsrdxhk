@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from contextlib import suppress
+from os import environ
 from re import findall, IGNORECASE
 from imdb import Cinemagoer
 from pycountry import countries as conn
