@@ -16,7 +16,7 @@ from bot.helper.telegram_helper.bot_commands import BotCommands
 from bot.helper.telegram_helper.button_build import ButtonMaker
 
 LIST_ITEMS = 4
-IMDB_GENRE_EMOJI = {"Action": "🚀", "Adult": "🔞", "Adventure": "🌋", "Animation": "🎠", "Biography": "📜", "Comedy": "🪗", "Crime": "🔪", "Documentary": "🎞", "Drama": "🎭", "Family": "👨‍👩‍👧‍👦", "Fantasy": "🫧", "Film Noir": "🎯", "Game Show": "🎮", "History": "🏛", "Horror": "🧟", "Musical": "🎻", "Music": "🎸", "Mystery": "🧳", "News": "📰", "Reality-TV": "🖥", "Romance": "🥰", "Sci-Fi": "🌠", "Short": "📝", "Sport": "⛳", "Talk-Show": "👨‍🍳", "Thriller": "🗡", "War": "⚔", "Western": "🪩"}
+GENRE_EMOJI = {"Action": "🚀", "Adult": "🔞", "Adventure": "🌋", "Animation": "🎠", "Biography": "📜", "Comedy": "🪗", "Crime": "🔪", "Documentary": "🎞", "Drama": "🎭", "Family": "👨‍👩‍👧‍👦", "Fantasy": "🫧", "Film Noir": "🎯", "Game Show": "🎮", "History": "🏛", "Horror": "🧟", "Musical": "🎻", "Music": "🎸", "Mystery": "🧳", "News": "📰", "Reality-TV": "🖥", "Romance": "🥰", "Sci-Fi": "🌠", "Short": "📝", "Sport": "⛳", "Talk-Show": "👨‍🍳", "Thriller": "🗡", "War": "⚔", "Western": "🪩"}
 MDL_API = "http://kuryana.vercel.app/" #Public API ! Do Not Abuse !
 
 async def mydramalist_search(_, message):
@@ -92,7 +92,7 @@ def list_to_hash(k, flagg=False, emoji=False):
     elif len(k) == 1:
         if not flagg:
             if emoji:
-                return str(IMDB_GENRE_EMOJI.get(k[0], '')+" #"+k[0].replace(" ", "_").replace("-", "_"))
+                return str(GENRE_EMOJI.get(k[0], '')+" #"+k[0].replace(" ", "_").replace("-", "_"))
             return str("#"+k[0].replace(" ", "_").replace("-", "_"))
         try:
             conflag = (conn.get(name=k[0])).flag
@@ -108,7 +108,7 @@ def list_to_hash(k, flagg=False, emoji=False):
                     conflag = (conn.get(name=elem)).flag
                     listing += f'{conflag} '
             if emoji:
-                listing += f"{IMDB_GENRE_EMOJI.get(elem, '')} "
+                listing += f"{GENRE_EMOJI.get(elem, '')} "
             listing += f'#{ele}, '
         return f'{listing[:-2]}'
     else:
