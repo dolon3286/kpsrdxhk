@@ -15,7 +15,6 @@ from bot.helper.ext_utils.task_manager import is_queued, stop_duplicate_check, l
 
 LOGGER = getLogger(__name__)
 
-
 class MyLogger:
     def __init__(self, obj):
         self.obj = obj
@@ -68,6 +67,9 @@ class YoutubeDLHelper:
             else "cookies.txt"
         )
         
+        if not ospath.exists(cookie_to_use):
+            LOGGER.warning(f"Cookie file '{cookie_to_use}' not found! Sites like PornHub may return HTTP 410 Gone without valid age-verification cookies.")
+        
         self.opts = {'progress_hooks': [self.__onDownloadProgress],
                      'logger': MyLogger(self),
                      'usenetrc': True,
@@ -83,6 +85,8 @@ class YoutubeDLHelper:
                      # Custom Advanced Options Injected Below
                      'concurrent_fragments': 8,
                      'impersonate': ImpersonateTarget.from_str("chrome"),
+                     'legacyserverconnect': True,
+                     'age_limit': 18,
                      'socket_timeout': 30,
                      'downloader': {
                          "http": "aria2c",
@@ -152,7 +156,9 @@ class YoutubeDLHelper:
                 self.__eta = d.get('eta', '-') or '-'
             try:
                 self.__progress = (self.__downloaded_bytes / self.__size) * 100
-            except:
+            except ZeroDivisionError:
+                pass
+            except Exception:
                 pass
 
     async def __onDownloadStart(self, from_queue=False):
@@ -206,6 +212,14 @@ class YoutubeDLHelper:
                 elif result.get('filesize_approx'):
                     self.__size = result['filesize_approx'] or 0
 
+    @staticmethod
+    def __is_embed_thumbnail_error(error):
+        error = str(error).lower()
+        return (
+            ("postprocessing" in error and "embed" in error and "thumbnail" in error)
+            or "unable to embed using ffprobe & ffmpeg" in error
+        )
+
     def __download(self, link, path):
         try:
             with YoutubeDL(self.opts) as ydl:
@@ -213,17 +227,29 @@ class YoutubeDLHelper:
                     ydl.download([link])
                 except DownloadError as e:
                     if not self.__is_cancelled:
-                        self.__onDownloadError(str(e))
-                    return
+                        # Fix applied: Verify if the error is just a thumbnail embedding fail
+                        if self.__is_embed_thumbnail_error(e):
+                            LOGGER.warning(f"Ignoring failed yt-dlp thumbnail embedding after download: {e}")
+                        else:
+                            self.__onDownloadError(str(e))
+                            return
+                    else:
+                        return
+            
             if self.is_playlist and (not ospath.exists(path) or len(listdir(path)) == 0):
                 self.__onDownloadError(
                     "No video available to download from this playlist. Check logs for more details")
                 return
+            
             if self.__is_cancelled:
                 raise ValueError
+            
             async_to_sync(self.__listener.onDownloadComplete)
         except ValueError:
             self.__onDownloadError("Download Stopped by User!")
+        except Exception as e:
+            if not self.__is_cancelled:
+                self.__onDownloadError(str(e))
 
     async def add_download(self, link, path, name, qual, playlist, options):
         if playlist:
@@ -286,9 +312,11 @@ class YoutubeDLHelper:
         if getattr(self.__listener, 'isLeech', False) and self.opts.get('writethumbnail'):
             self.opts['postprocessors'].append(
                 {'format': 'jpg', 'key': 'FFmpegThumbnailsConvertor', 'when': 'before_dl'})
-        if self.__ext in ['.mp3', '.mkv', '.mka', '.ogg', '.opus', '.flac', '.m4a', '.mp4', '.mov', 'm4v']:
+                
+        # Fix applied: Added the missing dot to `.m4v` and safely fetching `writethumbnail` boolean
+        if self.__ext in ['.mp3', '.mkv', '.mka', '.ogg', '.opus', '.flac', '.m4a', '.mp4', '.mov', '.m4v']:
             self.opts['postprocessors'].append(
-                {'already_have_thumbnail': getattr(self.__listener, 'isLeech', False), 'key': 'EmbedThumbnail'})
+                {'already_have_thumbnail': self.opts.get('writethumbnail', False), 'key': 'EmbedThumbnail'})
         elif not getattr(self.__listener, 'isLeech', False) or getattr(self.__listener, 'thumbnail_layout', False):
             self.opts['writethumbnail'] = False
 
