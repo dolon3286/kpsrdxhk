@@ -6,6 +6,7 @@ from asyncio import sleep, wait_for, Event, wrap_future
 from aiohttp import ClientSession
 from aiofiles.os import path as aiopath
 from yt_dlp import YoutubeDL
+from yt_dlp.networking.impersonate import ImpersonateTarget
 from functools import partial
 from time import time
 from ast import literal_eval
@@ -531,7 +532,18 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
         else "cookies.txt"
     )
     
-    options = {'usenetrc': True, 'cookiefile': cookie_to_use}
+    if not os.path.exists(cookie_to_use):
+        LOGGER.warning(f"Cookie file '{cookie_to_use}' not found! Extractions for sites like PornHub may fail with HTTP 410 Gone.")
+    
+    options = {
+        'usenetrc': True, 
+        'cookiefile': cookie_to_use,
+        'legacyserverconnect': True,
+        'age_limit': 18,
+        'impersonate': ImpersonateTarget.from_str("chrome"),
+        'socket_timeout': 30
+    }
+    
     if opt:
         yt_opt = opt.split('|')
         for ytopt in yt_opt:
