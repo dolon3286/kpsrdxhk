@@ -3,7 +3,6 @@ from os import path as ospath, listdir
 from secrets import token_hex
 from logging import getLogger
 from yt_dlp import YoutubeDL, DownloadError
-from yt_dlp.networking.impersonate import ImpersonateTarget
 from re import search as re_search
 
 from bot import download_dict_lock, download_dict, non_queued_dl, queue_dict_lock, bot_cache
@@ -14,6 +13,54 @@ from bot.helper.ext_utils.bot_utils import sync_to_async, async_to_sync
 from bot.helper.ext_utils.task_manager import is_queued, stop_duplicate_check, limit_checker
 
 LOGGER = getLogger(__name__)
+
+def get_base_ytdlp_options(cookiefile="cookies.txt"):
+    options = {
+        'usenetrc': True,
+        'cookiefile': cookiefile,
+        'allow_multiple_video_streams': True,
+        'allow_multiple_audio_streams': True,
+        'noprogress': True,
+        'allow_playlist_files': True,
+        'overwrites': True,
+        'writethumbnail': True,
+        'trim_file_name': 220,
+        'ffmpeg_location': f"/bin/{bot_cache['pkgs'][2]}",
+        'concurrent_fragments': 8,
+        'socket_timeout': 30,
+        'downloader': {
+            "http": "aria2c",
+            "https": "aria2c",
+        },
+        'downloader_args': {
+            "aria2c": [
+                "-x16",
+                "-k1M",
+                "-s16",
+                "--max-tries=5",
+                "--retry-wait=3",
+            ],
+        },
+        'extractor_args': {
+            "youtubetab": {"skip": ["webpage"]},
+        },
+        'hls_use_mpegts': True,
+        'fragment_retries': 10,
+        'retries': 10,
+        'retry_sleep_functions': {'http': lambda n: 3,
+                                  'fragment': lambda n: 3,
+                                  'file_access': lambda n: 3,
+                                  'extractor': lambda n: 3}
+    }
+    
+    # Safe impersonate sync: matches wzml but avoids crashing if curl-cffi is missing in kpsmlx
+    try:
+        from yt_dlp.networking.impersonate import ImpersonateTarget
+        options['impersonate'] = ImpersonateTarget.from_str("chrome")
+    except Exception:
+        pass
+        
+    return options
 
 class MyLogger:
     def __init__(self, obj):
@@ -37,7 +84,6 @@ class MyLogger:
     def error(msg):
         if msg != "ERROR: Cancelling...":
             LOGGER.error(msg)
-
 
 class YoutubeDLHelper:
     def __init__(self, listener):
@@ -67,51 +113,9 @@ class YoutubeDLHelper:
             else "cookies.txt"
         )
         
-        if not ospath.exists(cookie_to_use):
-            LOGGER.warning(f"Cookie file '{cookie_to_use}' not found! Sites like PornHub may return HTTP 410 Gone without valid age-verification cookies.")
-        
-        self.opts = {'progress_hooks': [self.__onDownloadProgress],
-                     'logger': MyLogger(self),
-                     'usenetrc': True,
-                     'cookiefile': cookie_to_use,
-                     'allow_multiple_video_streams': True,
-                     'allow_multiple_audio_streams': True,
-                     'noprogress': True,
-                     'allow_playlist_files': True,
-                     'overwrites': True,
-                     'writethumbnail': True,
-                     'trim_file_name': 220,
-                     'ffmpeg_location': f"/bin/{bot_cache['pkgs'][2]}",
-                     # Custom Advanced Options Injected Below
-                     'concurrent_fragments': 8,
-                     'impersonate': ImpersonateTarget.from_str("chrome"),
-                     'legacyserverconnect': True,
-                     'age_limit': 18,
-                     'socket_timeout': 30,
-                     'downloader': {
-                         "http": "aria2c",
-                         "https": "aria2c",
-                     },
-                     'downloader_args': {
-                         "aria2c": [
-                             "-x16",
-                             "-k1M",
-                             "-s16",
-                             "--max-tries=5",
-                             "--retry-wait=3",
-                         ],
-                     },
-                     'extractor_args': {
-                         "youtubetab": {"skip": ["webpage"]},
-                     },
-                     'hls_use_mpegts': True,
-                     'fragment_retries': 10,
-                     'retries': 10,
-                     # Custom options injected above
-                     'retry_sleep_functions': {'http': lambda n: 3,
-                                               'fragment': lambda n: 3,
-                                               'file_access': lambda n: 3,
-                                               'extractor': lambda n: 3}}
+        self.opts = get_base_ytdlp_options(cookie_to_use)
+        self.opts.update({'progress_hooks': [self.__onDownloadProgress],
+                          'logger': MyLogger(self)})
 
     @property
     def download_speed(self):
@@ -156,9 +160,7 @@ class YoutubeDLHelper:
                 self.__eta = d.get('eta', '-') or '-'
             try:
                 self.__progress = (self.__downloaded_bytes / self.__size) * 100
-            except ZeroDivisionError:
-                pass
-            except Exception:
+            except:
                 pass
 
     async def __onDownloadStart(self, from_queue=False):
@@ -227,7 +229,6 @@ class YoutubeDLHelper:
                     ydl.download([link])
                 except DownloadError as e:
                     if not self.__is_cancelled:
-                        # Fix applied: Verify if the error is just a thumbnail embedding fail
                         if self.__is_embed_thumbnail_error(e):
                             LOGGER.warning(f"Ignoring failed yt-dlp thumbnail embedding after download: {e}")
                         else:
@@ -240,10 +241,8 @@ class YoutubeDLHelper:
                 self.__onDownloadError(
                     "No video available to download from this playlist. Check logs for more details")
                 return
-            
             if self.__is_cancelled:
                 raise ValueError
-            
             async_to_sync(self.__listener.onDownloadComplete)
         except ValueError:
             self.__onDownloadError("Download Stopped by User!")
@@ -274,11 +273,12 @@ class YoutubeDLHelper:
             else:
                 self.__ext = f'.{audio_format}'
 
-        # Parse options BEFORE setting the format to prevent options from overriding UI selected qualities.
+        if not getattr(self.__listener, 'isLeech', False) or getattr(self.__listener, 'thumbnail_layout', False):
+            self.opts['writethumbnail'] = False
+
         if options:
             self.__set_options(options)
             
-        # Quality Selection Fix: Ensure format strictly applies after option parsing
         self.opts['format'] = qual
 
         await sync_to_async(self.extractMetaData, link, name)
@@ -309,16 +309,13 @@ class YoutubeDLHelper:
         if qual.startswith('ba/b'):
             self.name = f'{base_name}{self.__ext}'
 
-        if getattr(self.__listener, 'isLeech', False) and self.opts.get('writethumbnail'):
+        if self.opts.get('writethumbnail'):
             self.opts['postprocessors'].append(
                 {'format': 'jpg', 'key': 'FFmpegThumbnailsConvertor', 'when': 'before_dl'})
                 
-        # Fix applied: Added the missing dot to `.m4v` and safely fetching `writethumbnail` boolean
         if self.__ext in ['.mp3', '.mkv', '.mka', '.ogg', '.opus', '.flac', '.m4a', '.mp4', '.mov', '.m4v']:
             self.opts['postprocessors'].append(
                 {'already_have_thumbnail': self.opts.get('writethumbnail', False), 'key': 'EmbedThumbnail'})
-        elif not getattr(self.__listener, 'isLeech', False) or getattr(self.__listener, 'thumbnail_layout', False):
-            self.opts['writethumbnail'] = False
 
         msg, button = await stop_duplicate_check(self.name, self.__listener)
         if msg:
