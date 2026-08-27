@@ -6,7 +6,6 @@ from asyncio import sleep, wait_for, Event, wrap_future
 from aiohttp import ClientSession
 from aiofiles.os import path as aiopath
 from yt_dlp import YoutubeDL
-from yt_dlp.networking.impersonate import ImpersonateTarget
 from functools import partial
 from time import time
 from ast import literal_eval
@@ -16,7 +15,7 @@ from bot.helper.ext_utils.task_manager import task_utils
 from bot.helper.telegram_helper.message_utils import sendMessage, editMessage, deleteMessage, auto_delete_message, delete_links, open_category_btns, open_dump_btns
 from bot.helper.telegram_helper.button_build import ButtonMaker
 from bot.helper.ext_utils.bot_utils import get_readable_file_size, fetch_user_tds, fetch_user_dumps, is_url, is_gdrive_link, new_task, sync_to_async, is_rclone_path, new_thread, get_readable_time, arg_parser
-from bot.helper.mirror_utils.download_utils.yt_dlp_download import YoutubeDLHelper
+from bot.helper.mirror_utils.download_utils.yt_dlp_download import YoutubeDLHelper, get_base_ytdlp_options
 from bot.helper.mirror_utils.rclone_utils.list import RcloneList
 from bot.helper.telegram_helper.bot_commands import BotCommands
 from bot.helper.mirror_utils.upload_utils.gdriveTools import GoogleDriveHelper
@@ -225,7 +224,6 @@ class YtSelection:
         msg = f'Choose Audio{i} Qaulity:\n0 is best and 10 is worst\nTimeout: {get_readable_time(self.__timeout-(time()-self.__time))}'
         await editMessage(self.__reply_to, msg, subbuttons)
 
-
 def extract_info(link, options):
     with YoutubeDL(options) as ydl:
         result = ydl.extract_info(link, download=False)
@@ -244,7 +242,6 @@ async def _mdisk(link, name):
                 if not name:
                     name = resp_json['filename']
             return name, link
-
 
 @new_task
 async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
@@ -532,22 +529,14 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
         else "cookies.txt"
     )
     
-    if not os.path.exists(cookie_to_use):
-        LOGGER.warning(f"Cookie file '{cookie_to_use}' not found! Extractions for sites like PornHub may fail with HTTP 410 Gone.")
-    
-    options = {
-        'usenetrc': True, 
-        'cookiefile': cookie_to_use,
-        'legacyserverconnect': True,
-        'age_limit': 18,
-        'impersonate': ImpersonateTarget.from_str("chrome"),
-        'socket_timeout': 30
-    }
+    options = get_base_ytdlp_options(cookie_to_use)
     
     if opt:
         yt_opt = opt.split('|')
         for ytopt in yt_opt:
             key, value = map(str.strip, ytopt.split(':', 1))
+            if key in ["postprocessors", "download_ranges"]:
+                continue
             if key == 'format':
                 if select:
                     qual = ''
@@ -569,7 +558,7 @@ async def _ytdl(client, message, isLeech=False, sameDir=None, bulk=[]):
                 value = eval(value)
             options[key] = value
 
-        options['playlist_items'] = '0'
+    options['playlist_items'] = '0'
 
     try:
         result = await sync_to_async(extract_info, link, options)
@@ -608,7 +597,6 @@ async def ytdlleech(client, message):
         await sendMessage(message, "YT-DLP downloads are currently disabled by the Bot Owner.")
         return
     _ytdl(client, message, isLeech=True)
-
 
 bot.add_handler(MessageHandler(ytdl, filters=command(
     BotCommands.YtdlCommand) & CustomFilters.authorized & ~CustomFilters.blacklisted))
