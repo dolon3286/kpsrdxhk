@@ -130,6 +130,10 @@ async def add_mega_download(mega_link, path, listener, name):
 
     if MEGA_EMAIL and MEGA_PASSWORD:
         await executor.do(api.login, (MEGA_EMAIL, MEGA_PASSWORD))
+        if mega_listener.error is not None:
+            await sendMessage(listener.message, str(mega_listener.error))
+            api.logout()
+            return
 
     if get_mega_link_type(mega_link) == "file":
         await executor.do(api.getPublicNode, (mega_link,))
@@ -138,21 +142,27 @@ async def add_mega_download(mega_link, path, listener, name):
         folder_api = MegaApi(None, None, None, 'KPSML-X')
         folder_api.addListener(mega_listener)
         await executor.do(folder_api.loginToFolder, (mega_link,))
+        if mega_listener.error is not None:
+            await sendMessage(listener.message, str(mega_listener.error))
+            api.logout()
+            folder_api.logout()
+            return
         node = await sync_to_async(folder_api.authorizeNode, mega_listener.node)
+
     if mega_listener.error is not None:
         await sendMessage(listener.message, str(mega_listener.error))
-        await executor.do(api.logout, ())
+        api.logout()
         if folder_api is not None:
-            await executor.do(folder_api.logout, ())
+            folder_api.logout()
         return
 
     name = name or node.getName()
     msg, button = await stop_duplicate_check(name, listener)
     if msg:
         await sendMessage(listener.message, msg, button)
-        await executor.do(api.logout, ())
+        api.logout()
         if folder_api is not None:
-            await executor.do(folder_api.logout, ())
+            folder_api.logout()
         return
 
     gid = token_hex(5)
@@ -171,9 +181,9 @@ async def add_mega_download(mega_link, path, listener, name):
         await event.wait()
         async with download_dict_lock:
             if listener.uid not in download_dict:
-                await executor.do(api.logout, ())
+                api.logout()
                 if folder_api is not None:
-                    await executor.do(folder_api.logout, ())
+                    folder_api.logout()
                 return
         from_queue = True
         LOGGER.info(f'Start Queued Download from Mega: {name}')
@@ -194,6 +204,6 @@ async def add_mega_download(mega_link, path, listener, name):
 
     await makedirs(path, exist_ok=True)
     await executor.do(api.startDownload, (node, path, name, None, False, None))
-    await executor.do(api.logout, ())
+    api.logout()
     if folder_api is not None:
-        await executor.do(folder_api.logout, ())
+        folder_api.logout()
