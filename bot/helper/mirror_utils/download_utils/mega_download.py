@@ -58,12 +58,6 @@ class MegaAppListener(MegaListener):
 
     def onRequestTemporaryError(self, api, request, error: MegaError):
         LOGGER.error(f'Mega Request error in {error}')
-        if not self.is_cancelled:
-            self.is_cancelled = True
-            async_to_sync(self.listener.onDownloadError,
-                          f"RequestTempError: {error.toString()}")
-        self.error = error.toString()
-        self.continue_event.set()
 
     def onTransferUpdate(self, api: MegaApi, transfer: MegaTransfer):
         if self.is_cancelled:
