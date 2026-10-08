@@ -54,6 +54,7 @@ aria2_options = {}
 qbit_options = {}
 queued_dl = {}
 queued_up = {}
+jd_downloads = {}
 bot_cache = {}
 non_queued_dl = set()
 non_queued_up = set()
@@ -70,6 +71,7 @@ download_dict_lock = Lock()
 status_reply_dict_lock = Lock()
 queue_dict_lock = Lock()
 qb_listener_lock = Lock()
+jd_listener_lock = Lock()
 status_reply_dict = {}
 download_dict = {}
 rss_dict = {}
@@ -241,6 +243,14 @@ if len(USER_SESSION_STRING) != 0:
         user = ''
 
 MEGA_EMAIL = environ.get('MEGA_EMAIL', '')
+JD_EMAIL = environ.get('JD_EMAIL', '')
+JD_PASS = environ.get('JD_PASS', '')
+DISABLE_JD = environ.get('DISABLE_JD', '').lower() == 'true'
+JD_LIMIT = environ.get('JD_LIMIT', '')
+JD_LIMIT = '' if len(JD_LIMIT) == 0 else float(JD_LIMIT)
+CPU_LIMIT = environ.get('CPU_LIMIT', '20')
+CPU_LIMIT = int(CPU_LIMIT) if str(CPU_LIMIT).isdigit() else 20
+
 MEGA_PASSWORD = environ.get('MEGA_PASSWORD', '')
 if len(MEGA_EMAIL) == 0 or len(MEGA_PASSWORD) == 0:
     log_warning('MEGA Credentials not provided!')
@@ -673,6 +683,11 @@ config_dict = {'ANIME_TEMPLATE': ANIME_TEMPLATE,
                'MEDIA_GROUP': MEDIA_GROUP,
                'MEGA_EMAIL': MEGA_EMAIL,
                'MEGA_PASSWORD': MEGA_PASSWORD,
+               'JD_EMAIL': JD_EMAIL,
+               'JD_PASS': JD_PASS,
+               'DISABLE_JD': DISABLE_JD,
+               'JD_LIMIT': JD_LIMIT,
+               'CPU_LIMIT': CPU_LIMIT,
                'OWNER_ID': OWNER_ID,
                'QUEUE_ALL': QUEUE_ALL,
                'QUEUE_DOWNLOAD': QUEUE_DOWNLOAD,
