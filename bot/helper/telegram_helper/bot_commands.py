@@ -56,7 +56,7 @@ class _BotCommands:
         self.MyDramaListCommand = f'mdl{CMD_SUFFIX}'
         self.GDCleanCommand = [f'gdclean{CMD_SUFFIX}', f'gc{CMD_SUFFIX}']
         self.BroadcastCommand = [f'broadcast{CMD_SUFFIX}', f'bc{CMD_SUFFIX}']
-        self.JdGrabCommand = f'jdgrab{CMD_SUFFIX}'
-        self.JdDownloadCommand = f'jddownload{CMD_SUFFIX}'
+        self.JdMirrorCommand = [f'jdmirror{CMD_SUFFIX}', f'jm{CMD_SUFFIX}']
+        self.JdLeechCommand = [f'jdleech{CMD_SUFFIX}', f'jl{CMD_SUFFIX}']
 
 BotCommands = _BotCommands()
