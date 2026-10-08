@@ -2,6 +2,7 @@ from asyncio import sleep
 from json import dumps
 from random import randint
 from re import match
+from shutil import which
 
 from aiofiles import open as aiopen
 from aiofiles.os import listdir, makedirs, path, rename
@@ -91,16 +92,16 @@ class JDownloader(MyJdApi):
                 self.is_connected = False
                 return
 
-        svc_cores = ""
-        cmd = (
-            f"cpulimit -l {config_dict.get('CPU_LIMIT', 20)} -- "
+        java_cmd = (
             "java -Xms256m -Xmx500m "
             "-Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8 "
             "-Djava.awt.headless=true -jar /JDownloader/JDownloader.jar"
         )
-        if svc_cores:
-            cmd = f"taskset -c {svc_cores} {cmd}"
-
+        if which("cpulimit"):
+            cmd = f"cpulimit -l {config_dict.get('CPU_LIMIT', 20)} -- {java_cmd}"
+        else:
+            LOGGER.warning("cpulimit is not installed; starting JDownloader without CPU throttling.")
+            cmd = java_cmd
         self.is_connected = True
         _, __, code = await cmd_exec(cmd, shell=True)
         self.is_connected = False
