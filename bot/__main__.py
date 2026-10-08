@@ -29,10 +29,11 @@ from .helper.telegram_helper.message_utils import sendMessage, editMessage, edit
 from .helper.telegram_helper.filters import CustomFilters
 from .helper.telegram_helper.button_build import ButtonMaker
 from .helper.listeners.aria2_listener import start_aria2_listener
+from .core.jdownloader_booter import jdownloader
 from .helper.themes import BotTheme
 from .modules import authorize, clone, gd_count, gd_delete, gd_list, cancel_mirror, mirror_leech, status, torrent_search, torrent_select, ytdlp, \
                      rss, shell, eval, users_settings, bot_settings, speedtest, save_msg, images, anilist, mediainfo, mydramalist, gen_pyro_sess, \
-                     gd_clean, broadcast, category_select, jdownloader
+                     gd_clean, broadcast, category_select
 
 async def stats(client, message):
     msg, btns = await get_stats(message)
@@ -245,6 +246,8 @@ async def log_check():
 async def main():
     await gather(start_cleanup(), torrent_search.initiate_search_tools(), restart_notification(), search_images(), set_commands(bot), log_check())
     await sync_to_async(start_aria2_listener, wait=False)
+    if not config_dict.get('DISABLE_JD'):
+        bot.loop.create_task(jdownloader.boot())
     
     bot.add_handler(MessageHandler(
         start, filters=command(BotCommands.StartCommand) & private))
