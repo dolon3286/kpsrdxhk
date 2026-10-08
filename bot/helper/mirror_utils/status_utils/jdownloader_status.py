@@ -2,7 +2,7 @@ from time import time
 
 from bot import LOGGER, jd_listener_lock, jd_downloads
 from bot.core.jdownloader_booter import jdownloader
-from bot.helper.ext_utils.status_utils import get_readable_file_size, get_readable_time
+from bot.helper.ext_utils.bot_utils import MirrorStatus, get_readable_file_size, get_readable_time
 
 
 async def _query(gid, old):
@@ -70,12 +70,12 @@ class JDownloaderStatus:
         await self._update()
         state = str(self._info.get("status", "")).lower()
         if "finished" in state or state == "download complete":
-            return "completed"
+            return MirrorStatus.STATUS_DOWNLOAD
         if state in {"", "queued", "waiting", "jdlimit"}:
-            return "queuedDl" if not self._info.get("bytesLoaded") else "downloading"
+            return MirrorStatus.STATUS_QUEUEDL if not self._info.get("bytesLoaded") else MirrorStatus.STATUS_DOWNLOADING
         if "error" in state or "failed" in state:
-            return "error"
-        return "downloading"
+            return MirrorStatus.STATUS_DOWNLOADING
+        return MirrorStatus.STATUS_DOWNLOADING
 
     def task(self):
         return self
