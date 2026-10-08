@@ -25,6 +25,7 @@ motor
 mutagen
 markdown
 natsort
+niquests
 pytz
 pillow
 psutil
