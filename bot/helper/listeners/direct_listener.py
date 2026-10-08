@@ -38,12 +38,7 @@ class DirectListener:
             filename = content['filename']
             self.__a2c_opt['out'] = filename
             try:
-                opt = {**self.__a2c_opt}
-                if content.get('header'):
-                    opt['header'] = content['header']
-                else:
-                    opt.pop('header', None)
-                self.task = aria2.add_uris([content['url']], opt, position=0)
+                self.task = aria2.add_uris([content['url']], self.__a2c_opt, position=0)
             except Exception as e:
                 self.__failed += 1
                 LOGGER.error(f'Unable to download {filename} due to: {e}')

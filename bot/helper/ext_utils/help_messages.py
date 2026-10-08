@@ -321,8 +321,6 @@ But you can always use -c or -category with to select category before download s
 help_string = [f'''⌬ <b><i>Basic Commands!</i></b>
 
 <b>Use Mirror commands to download your link/file/rcl</b>
-┠ /{BotCommands.JdMirrorCommand[0]} or /{BotCommands.JdMirrorCommand[1]}: Mirror using JDownloader.
-┖ /{BotCommands.JdLeechCommand[0]} or /{BotCommands.JdLeechCommand[1]}: Leech using JDownloader.
 ┠ /{BotCommands.MirrorCommand[0]} or /{BotCommands.MirrorCommand[1]}: Download via file/url/media to Upload to Cloud Drive.
 ┖ /{BotCommands.CategorySelect}: Select Custom category to Upload to Cloud Drive from UserTds or Bot Categories.
 
@@ -497,11 +495,6 @@ default_desp = {'AS_DOCUMENT': 'Default type of Telegram file upload. Default is
                 'MEDIA_GROUP': 'View Uploaded splitted file parts in media group. Default is False.',
                 'MEGA_EMAIL': 'E-Mail used to sign-in on mega.nz for using premium account. Str',
                 'MEGA_PASSWORD': 'Password for mega.nz account. Str',
-                'JD_EMAIL': 'MyJDownloader account email used to connect the local JDownloader instance. Str',
-                'JD_PASS': 'MyJDownloader account password. Str',
-                'DISABLE_JD': 'Disable native JDownloader downloads. Bool',
-                'JD_LIMIT': 'Maximum size per JDownloader task in GB. Float',
-                'CPU_LIMIT': 'CPU percentage limit for JDownloader background service. Int',
                 'OWNER_ID': 'The Telegram User ID (not username) of the Owner of the bot.',
                 'QUEUE_ALL': 'Number of parallel tasks of downloads and uploads. For example if 20 task added and QUEUE_ALL is 8, then the summation of uploading and downloading tasks are 8 and the rest in queue. Int. NOTE: if you want to fill QUEUE_DOWNLOAD or QUEUE_UPLOAD, then QUEUE_ALL value must be greater than or equal to the greatest one and less than or equal to summation of QUEUE_UPLOAD and QUEUE_DOWNLOAD',
                 'QUEUE_DOWNLOAD': 'Number of all parallel downloading tasks. Int',
