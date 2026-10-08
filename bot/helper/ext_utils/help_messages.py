@@ -321,6 +321,8 @@ But you can always use -c or -category with to select category before download s
 help_string = [f'''⌬ <b><i>Basic Commands!</i></b>
 
 <b>Use Mirror commands to download your link/file/rcl</b>
+┠ /{BotCommands.JdGrabCommand}: Scan one or more URLs and show downloadable links in the LinkGrabber.
+┖ /{BotCommands.JdDownloadCommand}: Download selected links from the latest LinkGrabber result.
 ┠ /{BotCommands.MirrorCommand[0]} or /{BotCommands.MirrorCommand[1]}: Download via file/url/media to Upload to Cloud Drive.
 ┖ /{BotCommands.CategorySelect}: Select Custom category to Upload to Cloud Drive from UserTds or Bot Categories.
 
