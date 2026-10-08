@@ -131,6 +131,14 @@ async def load_config():
             x = x.lstrip('.')
             GLOBAL_EXTENSION_FILTER.append(x.strip().lower())
 
+    JD_EMAIL = environ.get('JD_EMAIL', '')
+    JD_PASS = environ.get('JD_PASS', '')
+    DISABLE_JD = environ.get('DISABLE_JD', '').lower() == 'true'
+    JD_LIMIT = environ.get('JD_LIMIT', '')
+    JD_LIMIT = '' if len(JD_LIMIT) == 0 else float(JD_LIMIT)
+    CPU_LIMIT = environ.get('CPU_LIMIT', '20')
+    CPU_LIMIT = int(CPU_LIMIT) if str(CPU_LIMIT).isdigit() else 20
+
     MEGA_EMAIL = environ.get('MEGA_EMAIL', '')
     MEGA_PASSWORD = environ.get('MEGA_PASSWORD', '')
     if len(MEGA_EMAIL) == 0 or len(MEGA_PASSWORD) == 0:
@@ -649,6 +657,11 @@ async def load_config():
                         'MEDIA_GROUP': MEDIA_GROUP,
                         'MEGA_EMAIL': MEGA_EMAIL,
                         'MEGA_PASSWORD': MEGA_PASSWORD,
+                        'JD_EMAIL': JD_EMAIL,
+                        'JD_PASS': JD_PASS,
+                        'DISABLE_JD': DISABLE_JD,
+                        'JD_LIMIT': JD_LIMIT,
+                        'CPU_LIMIT': CPU_LIMIT,
                         'MDL_TEMPLATE': MDL_TEMPLATE,
                         'OWNER_ID': OWNER_ID,
                         'QUEUE_ALL': QUEUE_ALL,
