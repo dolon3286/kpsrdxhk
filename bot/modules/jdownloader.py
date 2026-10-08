@@ -161,7 +161,7 @@ async def jd_grab(_, message):
 
     uid = message.from_user.id
     key = _key_for(uid, message.id)
-    _store()[key] = entries
+    _store()[key] = {"entries": entries, "message": message}
 
     buttons = ButtonMaker()
     buttons.ibutton("⬇️ Download All", f"jdg {uid} {message.id} all")
@@ -206,7 +206,7 @@ async def jd_download(_, message):
         await sendMessage(message, "No active LinkGrabber result found.")
         return
 
-    entries = _select(store[key], selection)
+    entries = _select(store[key]["entries"], selection)
     if not entries:
         await sendMessage(message, "No valid link numbers were selected.")
         return
@@ -228,9 +228,11 @@ async def jd_callback(_, query):
         return await query.answer("Not yours!", show_alert=True)
 
     key = _key_for(uid, int(msg_id))
-    entries = _store().get(key)
-    if not entries:
+    data = _store().get(key)
+    if not data:
         return await query.answer("LinkGrabber data expired.", show_alert=True)
+    entries = data["entries"]
+    source_message = data["message"]
 
     await query.answer()
 
@@ -243,7 +245,7 @@ async def jd_callback(_, query):
             query.message,
             f"Starting <b>{len(entries)}</b> LinkGrabber download(s)..."
         )
-        await _download_entries(query.message, entries)
+        await _download_entries(source_message, entries)
         _store().pop(key, None)
 
 
