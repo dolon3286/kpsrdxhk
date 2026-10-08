@@ -78,10 +78,18 @@ class JDownloader(MyJdApi):
         )
 
         if not await path.exists("/JDownloader/JDownloader.jar"):
-            LOGGER.error("JDownloader.jar was not found at /JDownloader/JDownloader.jar")
-            self.error = "JDownloader.jar is missing!"
-            self.is_connected = False
-            return
+            LOGGER.info("JDownloader.jar not found; downloading the official installer...")
+            await makedirs("/JDownloader", exist_ok=True)
+            _, __, code = await cmd_exec([
+                "curl", "-L", "--fail", "--retry", "3",
+                "-o", "/JDownloader/JDownloader.jar",
+                "https://installer.jdownloader.org/JDownloader.jar",
+            ])
+            if code != 0 or not await path.exists("/JDownloader/JDownloader.jar"):
+                LOGGER.error("Unable to download JDownloader.jar")
+                self.error = "JDownloader.jar is missing and automatic download failed!"
+                self.is_connected = False
+                return
 
         svc_cores = ""
         cmd = (
