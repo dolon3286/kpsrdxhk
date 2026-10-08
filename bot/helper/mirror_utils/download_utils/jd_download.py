@@ -205,7 +205,7 @@ async def add_jd_download(listener, path):
         if queued:
             async with download_dict_lock:
                 download_dict[listener.uid] = QueueStatus(
-                    listener.name, listener.size, gid, listener, "Dl"
+                    listener.name, listener.size, gid, listener, "dl"
                 )
             await listener.onDownloadStart()
             await sendStatusMessage(listener.message)
