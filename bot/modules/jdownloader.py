@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from html import escape
+from pyrogram.handlers import MessageHandler, CallbackQueryHandler
+from pyrogram.filters import command, regex
 from bot import bot, bot_cache, DOWNLOAD_DIR, config_dict, user_data
 from bot.helper.ext_utils.bot_utils import (
     new_task, sync_to_async, task_utils, fetch_user_tds,
