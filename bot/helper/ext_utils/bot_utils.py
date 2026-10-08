@@ -730,8 +730,8 @@ async def set_commands(client):
                 'Select Upload Category with UserTD or Bot Categories to upload only GDrive upload',
             ),
             BotCommand(BotCommands.CancelMirror, 'Cancel a Task of yours!'),
-            BotCommand(BotCommands.JdGrabCommand, 'Collect and inspect downloadable links like a LinkGrabber'),
-            BotCommand(BotCommands.JdDownloadCommand, 'Download selected links from a LinkGrabber result'),
+            BotCommand(BotCommands.JdMirrorCommand[0], f'or /{BotCommands.JdMirrorCommand[1]} Mirror to cloud using JDownloader'),
+            BotCommand(BotCommands.JdLeechCommand[0], f'or /{BotCommands.JdLeechCommand[1]} Leech to Telegram using JDownloader'),
             BotCommand(
                 BotCommands.CancelAllCommand[0],
                 'Cancel all Tasks in whole Bots.',
