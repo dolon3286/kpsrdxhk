@@ -103,9 +103,9 @@ async def crawl_page(session, url):
     return found
 
 
-async def resolve_one(url, session):
+async def resolve_one(url, session, depth=0):
     url = normalize_url(url)
-    if not url or is_magnet(url):
+    if not url or is_magnet(url) or depth > 1:
         return []
 
     info = await probe(session, url)
@@ -150,7 +150,7 @@ async def resolve_one(url, session):
     if info.get("is_html") or "text/html" in ctype:
         result = []
         for child in (await crawl_page(session, info.get("url", url)))[:MAX_LINKS]:
-            result.extend(await resolve_one(child, session))
+            result.extend(await resolve_one(child, session, depth + 1))
             if len(result) >= MAX_LINKS:
                 break
         return result[:MAX_LINKS]
