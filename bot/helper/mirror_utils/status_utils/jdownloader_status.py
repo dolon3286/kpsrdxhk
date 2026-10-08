@@ -70,7 +70,7 @@ class JDownloaderStatus:
         await self._update()
         state = str(self._info.get("status", "")).lower()
         if "finished" in state or state == "download complete":
-            return MirrorStatus.STATUS_DOWNLOAD
+            return MirrorStatus.STATUS_DOWNLOADING
         if state in {"", "queued", "waiting", "jdlimit"}:
             return MirrorStatus.STATUS_QUEUEDL if not self._info.get("bytesLoaded") else MirrorStatus.STATUS_DOWNLOADING
         if "error" in state or "failed" in state:
