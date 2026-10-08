@@ -188,14 +188,7 @@ async def jd_download(_, message):
 
     selection = "all"
     if len(message.command) > 1:
-        if message.command[1].replace(",", "").replace(" ", "").isdigit():
-            selection = message.command[1]
-        elif len(message.command) > 2:
-            selection = message.command[2]
-        elif message.command[1].isdigit():
-            key = _key_for(uid, int(message.command[1]))
-            if len(message.command) > 2:
-                selection = message.command[2]
+        selection = message.command[1]
 
     if key is None:
         own = [k for k in store if k.startswith(f"{uid}:")]
