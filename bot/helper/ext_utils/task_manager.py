@@ -131,12 +131,7 @@ async def limit_checker(size, listener, isTorrent=False, isMega=False, isDriveLi
     if await CustomFilters.sudo('', listener.message):
         return
     limit_exceeded = ''
-    if getattr(listener, 'isJd', False):
-        if JD_LIMIT := config_dict.get('JD_LIMIT'):
-            limit = JD_LIMIT * 1024**3
-            if size > limit:
-                limit_exceeded = f'JDownloader limit is {get_readable_file_size(limit)}'
-    elif listener.isClone:
+    if listener.isClone:
         if CLONE_LIMIT := config_dict['CLONE_LIMIT']:
             limit = CLONE_LIMIT * 1024**3
             if size > limit:

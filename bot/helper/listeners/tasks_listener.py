@@ -45,19 +45,15 @@ from bot.helper.themes import BotTheme
 
 class MirrorLeechListener:
     def __init__(self, message, compress=False, extract=False, isQbit=False, isLeech=False, tag=None, select=False, seed=False, sameDir=None, rcFlags=None, upPath=None, isClone=False, 
-                join=False, drive_id=None, index_link=None, isYtdlp=False, source_url=None, logMessage=None, leech_utils={}, isJd=False):
+                join=False, drive_id=None, index_link=None, isYtdlp=False, source_url=None, logMessage=None, leech_utils={}):
         if sameDir is None:
             sameDir = {}
         self.message = message
         self.uid = message.id
-        self.user_id = message.from_user.id
-        self.is_cancelled = False
-        self.size = 0
         self.excep_chat = bool(str(message.chat.id) in config_dict['EXCEP_CHATS'].split())
         self.extract = extract
         self.compress = compress
         self.isQbit = isQbit
-        self.isJd = isJd
         self.isLeech = isLeech
         self.isClone = isClone
         self.isMega = is_mega_link(source_url) if source_url else False
@@ -70,6 +66,7 @@ class MirrorLeechListener:
         self.select = select
         self.isSuperGroup = message.chat.type in [ChatType.SUPERGROUP, ChatType.CHANNEL]
         self.isPrivate = message.chat.type == ChatType.BOT
+        self.user_id = self.message.from_user.id
         self.user_dict = user_data.get(self.user_id, {})
         self.isPM = config_dict['BOT_PM'] or self.user_dict.get('bot_pm')
         self.suproc = None
@@ -85,7 +82,6 @@ class MirrorLeechListener:
         self.botpmmsg = None
         self.upload_details = {}
         self.leech_utils = leech_utils
-        self.link = source_url or (message.text.split(None, 1)[1] if message.text and len(message.command) > 1 else '')
         self.source_url = (
             source_url
             if source_url and source_url.startswith('http')
@@ -103,8 +99,7 @@ class MirrorLeechListener:
                 if Interval:
                     Interval[0].cancel()
                     Interval.clear()
-            if not self.isJd:
-                await sync_to_async(aria2.purge)
+            await sync_to_async(aria2.purge)
             await delete_all_messages()
         except Exception:
             pass
@@ -112,7 +107,7 @@ class MirrorLeechListener:
     def __setModeEng(self):
         mode = f" #{'Leech' if self.isLeech else 'Clone' if self.isClone else 'RClone' if self.upPath not in ['gd', 'ddl'] else 'DDL' if self.upPath != 'gd' else 'GDrive'}"
         mode += ' (Zip)' if self.compress else ' (Unzip)' if self.extract else ''
-        mode += f" | #{'JDownloader' if self.isJd else 'qBit' if self.isQbit else 'ytdlp' if self.isYtdlp else 'GDrive' if (self.isClone or self.isGdrive) else 'Mega' if self.isMega else 'Aria2' if self.source_url and self.source_url != self.message.link else 'Tg'}"
+        mode += f" | #{'qBit' if self.isQbit else 'ytdlp' if self.isYtdlp else 'GDrive' if (self.isClone or self.isGdrive) else 'Mega' if self.isMega else 'Aria2' if self.source_url and self.source_url != self.message.link else 'Tg'}"
         self.upload_details['mode'] = mode
         
     def __parseSource(self):
