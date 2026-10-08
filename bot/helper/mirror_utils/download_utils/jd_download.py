@@ -242,6 +242,8 @@ async def add_jd_download(listener, path):
         async with download_dict_lock:
             download_dict[listener.uid] = JDownloaderStatus(listener, gid)
 
+        async with queue_dict_lock:
+            non_queued_dl.add(listener.uid)
         if queued:
             await start_from_queued()
         else:
