@@ -19,7 +19,7 @@ from bot.helper.telegram_helper.message_utils import sendMessage, sendFile, edit
 from bot.helper.telegram_helper.filters import CustomFilters
 from bot.helper.telegram_helper.bot_commands import BotCommands
 from bot.helper.telegram_helper.button_build import ButtonMaker
-from bot.helper.ext_utils.bot_utils import setInterval, sync_to_async, new_thread
+from bot.helper.ext_utils.bot_utils import setInterval, sync_to_async, new_thread, extra_btns
 from bot.helper.ext_utils.db_handler import DbManger
 from bot.helper.ext_utils.task_manager import start_from_queued
 from bot.helper.ext_utils.help_messages import default_desp
@@ -794,6 +794,7 @@ async def get_buttons(key=None, edit_type=None, edit_mode=None, mess=None):
         buttons.ibutton('Empty String', f"botset emptyqbit {key}")
         buttons.ibutton('Close', "botset close")
         msg = f'Send a valid value for {key}. Timeout: 60 sec'
+    buttons, _ = extra_btns(buttons)
     button = buttons.build_menu(1) if key is None else buttons.build_menu(2)
     return msg, button
 
@@ -1023,6 +1024,7 @@ async def update_private_file(_, message, pre_message):
             msg = '<i>Do you want to Upload (Git Push) your file to <b>UPSTREAM_REPO</b> ?</i>'
             buttons.ibutton('Yes!', f"botset push {file_name}")
             buttons.ibutton('No!', "botset close")
+            buttons, _ = extra_btns(buttons)
             await sendMessage(message, msg, buttons.build_menu(2))
         else:
             await deleteMessage(message)

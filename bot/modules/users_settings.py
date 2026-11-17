@@ -21,7 +21,7 @@ from bot.helper.telegram_helper.bot_commands import BotCommands
 from bot.helper.telegram_helper.button_build import ButtonMaker
 from bot.helper.mirror_utils.upload_utils.gdriveTools import GoogleDriveHelper
 from bot.helper.ext_utils.db_handler import DbManger
-from bot.helper.ext_utils.bot_utils import getdailytasks, update_user_ldata, get_readable_file_size, sync_to_async, new_thread, is_gdrive_link
+from bot.helper.ext_utils.bot_utils import getdailytasks, update_user_ldata, get_readable_file_size, sync_to_async, new_thread, is_gdrive_link, extra_btns
 from bot.helper.mirror_utils.upload_utils.ddlserver.gofile import Gofile
 from bot.helper.themes import BotTheme
 
@@ -89,6 +89,7 @@ async def get_user_settings(from_user, key=None, edit_type=None, edit_mode=None)
 
         text = BotTheme('USER_SETTING', NAME=name, ID=user_id, USERNAME=f'@{from_user.username}', LANG=Language.get(lc).display_name() if (lc := from_user.language_code) else "N/A", DC=from_user.dc_id)
         
+        buttons, _ = extra_btns(buttons)
         button = buttons.build_menu(1)
     elif key == 'universal':
         ytopt = 'Not Exists' if (val:=user_dict.get('yt_opt', config_dict.get('YT_DLP_OPTIONS', ''))) == '' else val
@@ -124,6 +125,7 @@ async def get_user_settings(from_user, key=None, edit_type=None, edit_mode=None)
         text += f"\n➲ <b>Token Drive ID :</b> <code>{escape(token_drive)}</code>"
         buttons.ibutton("Back", f"userset {user_id} back", "footer")
         buttons.ibutton("Close", f"userset {user_id} close", "footer")
+        buttons, _ = extra_btns(buttons)
         button = buttons.build_menu(2)
     elif key == 'mirror':
         buttons.ibutton("RClone", f"userset {user_id} rcc")
@@ -154,6 +156,7 @@ async def get_user_settings(from_user, key=None, edit_type=None, edit_mode=None)
 
         buttons.ibutton("Back", f"userset {user_id} back", "footer")
         buttons.ibutton("Close", f"userset {user_id} close", "footer")
+        buttons, _ = extra_btns(buttons)
         button = buttons.build_menu(2)
     elif key == 'leech':
         if user_dict.get('as_doc', False) or 'as_doc' not in user_dict and config_dict['AS_DOCUMENT']:
@@ -205,6 +208,7 @@ async def get_user_settings(from_user, key=None, edit_type=None, edit_mode=None)
 
         buttons.ibutton("Back", f"userset {user_id} back", "footer")
         buttons.ibutton("Close", f"userset {user_id} close", "footer")
+        buttons, _ = extra_btns(buttons)
         button = buttons.build_menu(2)
     elif key == "ddl_servers":
         ddl_serv, serv_list = 0, []
@@ -220,6 +224,7 @@ async def get_user_settings(from_user, key=None, edit_type=None, edit_mode=None)
             buttons.ibutton(f"{'✅️' if btn in serv_list else ''} {fname_dict[btn]}", f"userset {user_id} {btn}")
         buttons.ibutton("Back", f"userset {user_id} back mirror", "footer")
         buttons.ibutton("Close", f"userset {user_id} close", "footer")
+        buttons, _ = extra_btns(buttons)
         button = buttons.build_menu(2)
     elif edit_type:
         text = f"㊂ <b><u>{fname_dict[key]} Settings :</u></b>\n\n"
@@ -290,6 +295,7 @@ async def get_user_settings(from_user, key=None, edit_type=None, edit_mode=None)
             buttons.ibutton("↻ Delete", f"userset {user_id} d{key}")
         buttons.ibutton("Back", f"userset {user_id} back {edit_type}", "footer")
         buttons.ibutton("Close", f"userset {user_id} close", "footer")
+        buttons, _ = extra_btns(buttons)
         button = buttons.build_menu(2)
     return text, button
 
@@ -310,6 +316,9 @@ async def user_settings(client, message):
                 return await set_custom(client, reply_to, msg, set_arg, True)
             elif set_arg == 'thumb' and reply_to.media:
                 return await set_thumb(client, reply_to, msg, set_arg, True)
+        buttons = ButtonMaker()
+        buttons.ibutton("Close", f"userset {message.from_user.id} close")
+        buttons, _ = extra_btns(buttons)
         await editMessage(msg, '''㊂ <b><u>Available Flags :</u></b>
 >> Reply to the Value with appropriate arg respectively to set directly without opening USet.
 
@@ -330,7 +339,7 @@ async def user_settings(client, message):
 ➲ <b>YT-DLP Options :</b>
     /cmd -s yt_opt
 ➲ <b>Leech User Dump :</b>
-    /cmd -s ldump''')
+    /cmd -s ldump''', buttons.build_menu(1))
     else:
         from_user = message.from_user
         handler_dict[from_user.id] = False
@@ -740,6 +749,7 @@ async def edit_user_settings(client, query):
         buttons.ibutton('Yes', f"userset {user_id} reset_now y")
         buttons.ibutton('No', f"userset {user_id} reset_now n")
         buttons.ibutton("Close", f"userset {user_id} close", "footer")
+        buttons, _ = extra_btns(buttons)
         await editMessage(message, 'Do you want to Reset Settings ?', buttons.build_menu(2))
     elif data[2] == 'reset_now':
         handler_dict[user_id] = False
@@ -795,6 +805,7 @@ async def send_users_settings(client, message):
         msg = f'<u><b>Total Users / Chats Data Saved :</b> {len(user_data)}</u>'
         buttons = ButtonMaker()
         buttons.ibutton("Close", f"userset {message.from_user.id} close")
+        buttons, _ = extra_btns(buttons)
         button = buttons.build_menu(1)
         for user, data in user_data.items():
             msg += f'\n\n<code>{user}</code>:'
@@ -817,6 +828,7 @@ async def send_users_settings(client, message):
             buttons = ButtonMaker()
             buttons.ibutton("Delete Data", f"userset {message.from_user.id} user_del {userid}")
             buttons.ibutton("Close", f"userset {message.from_user.id} close")
+            buttons, _ = extra_btns(buttons)
             button = buttons.build_menu(1)
             for key, value in data.items():
                 if key in ['token', 'time', 'ddl_servers', 'usess']:
