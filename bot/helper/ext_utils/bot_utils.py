@@ -139,15 +139,32 @@ def handleIndex(index, dic):
     return index
 
 def get_progress_bar_string(pct):
-    pct = float(str(pct).strip('%'))
+    try:
+        pct = float(str(pct).strip('%'))
+    except Exception:
+        pct = 0.0
     p = min(max(pct, 0), 100)
-    cFull = int(p // 8)
-    cPart = int(p % 8 - 1)
-    p_str = '■' * cFull
-    if cPart >= 0:
-        p_str += ['▤', '▥', '▦', '▧', '▨', '▩', '■'][cPart]
-    p_str += '□' * (12 - cFull)
+    cFull = int(p // 10)
+    rem = p % 10
+    cPart = 1 if rem >= 3 and cFull < 10 else 0
+    p_str = '⬤' * cFull + ('◑' if cPart else '')
+    p_str += '○' * (10 - cFull - cPart)
     return f"[{p_str}]"
+
+
+def parse_time_to_seconds(time_str):
+    if not time_str or time_str == '-':
+        return 0
+    import re
+    total = 0
+    matches = re.findall(r'(\d+)\s*([dhms])', str(time_str))
+    for val, unit in matches:
+        val = int(val)
+        if unit == 'd': total += val * 86400
+        elif unit == 'h': total += val * 3600
+        elif unit == 'm': total += val * 60
+        elif unit == 's': total += val
+    return total
 
 
 def get_all_versions():
@@ -203,105 +220,142 @@ class EngineStatus:
 
 
 def get_readable_message():
-    msg = ""
-    button = None
-    STATUS_LIMIT = config_dict['STATUS_LIMIT']
     tasks = len(download_dict)
+    if tasks == 0:
+        return None, None, None, None
+
+    STATUS_LIMIT = config_dict['STATUS_LIMIT']
     globals()['PAGES'] = (tasks + STATUS_LIMIT - 1) // STATUS_LIMIT
     if PAGE_NO > PAGES and PAGES != 0:
         globals()['STATUS_START'] = STATUS_LIMIT * (PAGES - 1)
         globals()['PAGE_NO'] = PAGES
-    for download in list(download_dict.values())[STATUS_START:STATUS_LIMIT+STATUS_START]:
+
+    tasks_msg = ""
+    tasks_buttons = ButtonMaker()
+
+    downloads_list = list(download_dict.values())
+    visible_downloads = downloads_list[STATUS_START:STATUS_LIMIT+STATUS_START]
+
+    for idx, download in enumerate(visible_downloads, start=STATUS_START + 1):
         msg_link = download.message.link if download.message.chat.type in [
             ChatType.SUPERGROUP, ChatType.CHANNEL] and not config_dict['DELETE_LINKS'] else ''
         elapsed = time() - download.message.date.timestamp()
-        msg += BotTheme('STATUS_NAME', Name="Task is being Processed!" if config_dict['SAFE_MODE'] and elapsed >= config_dict['STATUS_UPDATE_INTERVAL'] else escape(f'{download.name()}'))
-        if download.status() not in [MirrorStatus.STATUS_SPLITTING, MirrorStatus.STATUS_SEEDING]:
-            msg += BotTheme('BAR', Bar=f"{get_progress_bar_string(download.progress())} {download.progress()}")
-            msg += BotTheme('PROCESSED', Processed=f"{download.processed_bytes()} of {download.size()}")
-            msg += BotTheme('STATUS', Status=download.status(), Url=msg_link)
-            msg += BotTheme('ETA', Eta=download.eta())
-            msg += BotTheme('SPEED', Speed=download.speed())
-            msg += BotTheme('ELAPSED', Elapsed=get_readable_time(elapsed))
-            msg += BotTheme('ENGINE', Engine=download.eng())
-            msg += BotTheme('STA_MODE', Mode=download.upload_details['mode'])
+        elapsed_str = get_readable_time(elapsed)
+
+        name = "Task is being Processed!" if config_dict['SAFE_MODE'] and elapsed >= config_dict['STATUS_UPDATE_INTERVAL'] else escape(f'{download.name()}')
+        user = download.message.from_user.mention(style="html")
+        user_id = download.message.from_user.id
+        link_part = f" [<a href='{msg_link}'>Link</a>]" if msg_link else ""
+
+        # Progress string
+        progress_val = download.progress() if hasattr(download, 'progress') else "0%"
+        bar_str = get_progress_bar_string(progress_val)
+
+        # Mode parsing
+        mode_raw = download.upload_details.get('mode', '')
+        if '|' in mode_raw:
+            parts = [m.strip() for m in mode_raw.split('|', 1)]
+            out_mode, in_mode = parts[0], parts[1]
+        else:
+            out_mode = mode_raw.strip() or '#Leech'
+            in_mode = '#Aria2'
+
+        # Status text with source/engine
+        status_val = download.status()
+        eng_name = download.eng()
+        if in_mode == '#Mega' or 'mega' in eng_name.lower():
+            status_display = f"{status_val} (mega.nz)"
+        elif 'drive' in eng_name.lower() or in_mode == '#GDrive':
+            status_display = f"{status_val} (drive.google.com)"
+        elif hasattr(download, 'source_url') and download.source_url and download.source_url.startswith('http'):
+            try:
+                from urllib.parse import urlparse
+                domain = urlparse(download.source_url).netloc
+                status_display = f"{status_val} ({domain})" if domain else status_val
+            except Exception:
+                status_display = status_val
+        else:
+            status_display = status_val
+
+        # Time formatting: Elapsed of Total ( Eta )
+        eta_val = download.eta() if hasattr(download, 'eta') else '-'
+        eta_sec = parse_time_to_seconds(eta_val)
+        if eta_sec > 0 and eta_val != '-':
+            total_sec = int(elapsed) + eta_sec
+            time_display = f"{elapsed_str} of {get_readable_time(total_sec)} ( {eta_val} )"
+        else:
+            time_display = f"{elapsed_str}"
+
+        tasks_msg += f"<b>{idx}. {name}</b>\n"
+        tasks_msg += f"↬ Task By {user} ( #ID{user_id} ){link_part}\n\n"
+
+        if status_val == MirrorStatus.STATUS_SEEDING:
+            tasks_msg += f"{bar_str} 100%\n\n"
+            table_rows = (
+                f"<tr><td>⇥ Uploaded</td><td>{download.uploaded_bytes()} of {download.size()}</td></tr>\n"
+                f"<tr><td>↳ Status</td><td>{status_display}</td></tr>\n"
+                f"<tr><td>↳ Speed</td><td>{download.upload_speed()}</td></tr>\n"
+                f"<tr><td>↳ Time</td><td>{download.seeding_time()} ( Ratio: {download.ratio()} )</td></tr>\n"
+                f"<tr><td>↳ Engine</td><td>{eng_name}</td></tr>\n"
+                f"<tr><td>↳ In Mode</td><td>{in_mode}</td></tr>\n"
+                f"<tr><td>↳ Out Mode</td><td>#Seed</td></tr>\n"
+            )
+        elif status_val not in [MirrorStatus.STATUS_SPLITTING, MirrorStatus.STATUS_SEEDING]:
+            tasks_msg += f"{bar_str} {progress_val}\n\n"
+            table_rows = (
+                f"<tr><td>⇥ Processed</td><td>{download.processed_bytes()} of {download.size()}</td></tr>\n"
+                f"<tr><td>↳ Status</td><td>{status_display}</td></tr>\n"
+                f"<tr><td>↳ Speed</td><td>{download.speed()}</td></tr>\n"
+                f"<tr><td>↳ Time</td><td>{time_display}</td></tr>\n"
+                f"<tr><td>↳ Engine</td><td>{eng_name}</td></tr>\n"
+                f"<tr><td>↳ In Mode</td><td>{in_mode}</td></tr>\n"
+                f"<tr><td>↳ Out Mode</td><td>{out_mode}</td></tr>\n"
+            )
             if hasattr(download, 'seeders_num'):
                 try:
-                    msg += BotTheme('SEEDERS', Seeders=download.seeders_num())
-                    msg += BotTheme('LEECHERS', Leechers=download.leechers_num())
+                    table_rows += f"<tr><td>↳ Seeds/Leechs</td><td>{download.seeders_num()} / {download.leechers_num()}</td></tr>\n"
                 except Exception:
                     pass
-        elif download.status() == MirrorStatus.STATUS_SEEDING:
-            msg += BotTheme('STATUS', Status=download.status(), Url=msg_link)
-            msg += BotTheme('SEED_SIZE', Size=download.size())
-            msg += BotTheme('SEED_SPEED', Speed=download.upload_speed())
-            msg += BotTheme('UPLOADED', Upload=download.uploaded_bytes())
-            msg += BotTheme('RATIO', Ratio=download.ratio())
-            msg += BotTheme('TIME', Time=download.seeding_time())
-            msg += BotTheme('SEED_ENGINE', Engine=download.eng())
         else:
-            msg += BotTheme('STATUS', Status=download.status(), Url=msg_link)
-            msg += BotTheme('STATUS_SIZE', Size=download.size())
-            msg += BotTheme('NON_ENGINE', Engine=download.eng())
+            tasks_msg += f"{bar_str} {progress_val}\n\n"
+            table_rows = (
+                f"<tr><td>⇥ Size</td><td>{download.size()}</td></tr>\n"
+                f"<tr><td>↳ Status</td><td>{status_display}</td></tr>\n"
+                f"<tr><td>↳ Elapsed</td><td>{elapsed_str}</td></tr>\n"
+                f"<tr><td>↳ Engine</td><td>{eng_name}</td></tr>\n"
+                f"<tr><td>↳ In Mode</td><td>{in_mode}</td></tr>\n"
+                f"<tr><td>↳ Out Mode</td><td>{out_mode}</td></tr>\n"
+            )
 
-        msg += BotTheme('USER',
-                        User=download.message.from_user.mention(style="html"))
-        msg += BotTheme('ID', Id=download.message.from_user.id)
-        if (download.eng()).startswith("qBit"):
-            msg += BotTheme('BTSEL', Btsel=f"/{BotCommands.BtSelectCommand}_{download.gid()}")
-        msg += BotTheme('CANCEL', Cancel=f"/{BotCommands.CancelMirror}_{download.gid()}")
+        tasks_msg += f"<table>\n{table_rows}</table>\n\n"
 
-    if len(msg) == 0:
-        return None, None
+        # Cancel button for this task
+        tasks_buttons.ibutton(f"Cancel #{idx}", f"status can {download.gid()}")
+        if eng_name.startswith("qBit"):
+            tasks_buttons.ibutton(f"Select #{idx}", f"btsel {download.gid()}")
 
-    dl_speed = 0
+    # Message 2: Bot Stats
+    currentTime = get_readable_time(time() - botStartTime)
+    free_bytes = disk_usage(config_dict['DOWNLOAD_DIR']).free
+    free = get_readable_file_size(free_bytes)
+    free_p = round(100 - disk_usage(config_dict['DOWNLOAD_DIR']).percent, 1)
 
-    def convert_speed_to_bytes_per_second(spd):
-        if 'K' in spd:
-            return float(spd.split('K')[0]) * 1024
-        elif 'M' in spd:
-            return float(spd.split('M')[0]) * 1048576
-        elif 'G' in spd:
-            return float(spd.split('G')[0]) * 1073741824
-        elif 'T' in spd:
-            return float(spd.split('T')[0]) * 1099511627776
-        else:
-            return 0
+    stats_msg = (
+        "₪ <b>Bot Stats</b>\n"
+        f"<b>Page:</b> {PAGE_NO}/{PAGES} | <b>Tasks:</b> {tasks} | <b>Step:</b> 1\n\n"
+        "<table>\n"
+        "<tr><th>⌘ CPU</th><th>∞ Free</th><th>⬝⬝ RAM</th><th>↳ UP</th></tr>\n"
+        f"<tr><td>{cpu_percent()}%</td><td>{free} [{free_p}%]</td><td>{virtual_memory().percent}%</td><td>{currentTime}</td></tr>\n"
+        "</table>"
+    )
 
-    dl_speed = 0
-    up_speed = 0
-    for download in download_dict.values():
-        tstatus = download.status()
-        spd = download.speed() if tstatus != MirrorStatus.STATUS_SEEDING else download.upload_speed()
-        speed_in_bytes_per_second = convert_speed_to_bytes_per_second(spd)
-        if tstatus == MirrorStatus.STATUS_DOWNLOADING:
-            dl_speed += speed_in_bytes_per_second
-        elif tstatus in [
-            MirrorStatus.STATUS_UPLOADING,
-            MirrorStatus.STATUS_SEEDING,
-        ]:
-            up_speed += speed_in_bytes_per_second
+    stats_buttons = ButtonMaker()
+    stats_buttons.ibutton("<<", "status pre")
+    stats_buttons.ibutton(">>", "status nex")
+    stats_buttons.ibutton(BotTheme('TSTATS'), "status tstats")
+    stats_buttons.ibutton(BotTheme('REFRESH'), "status ref")
 
-    msg += BotTheme('FOOTER')
-    buttons = ButtonMaker()
-    buttons.ibutton(BotTheme('REFRESH', Page=f"{PAGE_NO}/{PAGES}"), "status ref")
-    if tasks > STATUS_LIMIT:
-        if config_dict['BOT_MAX_TASKS']:
-            msg += BotTheme('BOT_TASKS', Tasks=tasks, Ttask=config_dict['BOT_MAX_TASKS'], Free=config_dict['BOT_MAX_TASKS']-tasks)
-        else:
-            msg += BotTheme('TASKS', Tasks=tasks)
-        buttons = ButtonMaker()
-        buttons.ibutton(BotTheme('PREVIOUS'), "status pre")
-        buttons.ibutton(BotTheme('REFRESH', Page=f"{PAGE_NO}/{PAGES}"), "status ref")
-        buttons.ibutton(BotTheme('NEXT'), "status nex")
-    button = buttons.build_menu(3)
-    msg += BotTheme('Cpu', cpu=cpu_percent())
-    msg += BotTheme('FREE', free=get_readable_file_size(disk_usage(config_dict['DOWNLOAD_DIR']).free), free_p=round(100-disk_usage(config_dict['DOWNLOAD_DIR']).percent, 1))
-    msg += BotTheme('Ram', ram=virtual_memory().percent)
-    msg += BotTheme('uptime', uptime=get_readable_time(time() - botStartTime))
-    msg += BotTheme('DL', DL=get_readable_file_size(dl_speed))
-    msg += BotTheme('UL', UL=get_readable_file_size(up_speed))
-    return msg, button
+    return tasks_msg.strip(), tasks_buttons.build_menu(2), stats_msg.strip(), stats_buttons.build_menu(4)
 
 
 async def turn_page(data):
