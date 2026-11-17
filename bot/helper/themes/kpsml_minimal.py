@@ -136,7 +136,8 @@ Type {help_command} to get a list of available commands</b>'''
     L_LOG_START =           "➲ <b><u>Leech Started :</u></b>\n┃\n┠ <b>User :</b> {mention} ( #ID{uid} )\n┖ <b>Source :</b> <a href='{msg_link}'>Click Here</a>"
 
     # async def onUploadComplete(): ---> tasks_listener.py
-    NAME =                  '<b><i>{Name}</i></b>\n┃\n'
+    NAME =                  '<b>{Name}</b>\n'
+    TAG =                   '↬ <b>Task By:</b> {Tag}\n\n'
     SIZE =                  '┠ <b>Size: </b>{Size}\n'
     ELAPSE =                '┠ <b>Elapsed: </b>{Time}\n'
     MODE =                  '┠ <b>Mode: </b>{Mode}\n'
@@ -173,10 +174,11 @@ Type {help_command} to get a list of available commands</b>'''
 
     # def get_readable_message(): ---> bot_utilis.py
     ####--------OVERALL MSG HEADER----------
-    STATUS_NAME =       '<b><i>{Name}</i></b>'
+    STATUS_NAME =       '<b>{index}. {Name}</b>\n'
+    STATUS_USER =       '↬ Task By {User} ( #ID{Id} ){Link}\n\n'
 
     #####---------PROGRESSIVE STATUS-------
-    BAR =               '\n┃ {Bar}'
+    BAR =               '{Bar} {Progress}\n\n'
     PROCESSED =         '\n┠ <b>Processed:</b> {Processed}'
     STATUS =            '\n┠ <b>Status:</b> <a href="{Url}">{Status}</a>'
     ETA =                                                ' | <b>ETA:</b> {Eta}'
@@ -206,9 +208,9 @@ Type {help_command} to get a list of available commands</b>'''
     CANCEL =         '\n┖ {Cancel}\n\n'
 
     ####------FOOTER--------
-    FOOTER = '⌬ <b><i>Bot Stats</i></b>\n'
-    TASKS =  '┠ <b>Tasks:</b> {Tasks}\n'
-    BOT_TASKS = '┠ <b>Tasks:</b> {Tasks}/{Ttask} | <b>AVL:</b> {Free}\n'
+    FOOTER = '₪ <b>Bot Stats</b>\n'
+    TASKS =  '<b>Page:</b> {Page} | <b>Tasks:</b> {Tasks} | <b>Step:</b> {Step}\n\n'
+    BOT_TASKS = '<b>Page:</b> {Page} | <b>Tasks:</b> {Tasks}/{Ttask} | <b>Step:</b> {Step}\n\n'
     Cpu = '┠ <b>CPU:</b> {cpu}% | '
     FREE =                      '<b>F:</b> {free} [{free_p}%]'
     Ram = '\n┠ <b>RAM:</b> {ram}% | '
@@ -217,9 +219,10 @@ Type {help_command} to get a list of available commands</b>'''
     UL =                        '<b>UL:</b> {UL}/s'
 
     ###--------BUTTONS-------
-    PREVIOUS = '⫷'
-    REFRESH = 'ᴘᴀɢᴇs\n{Page}'
-    NEXT = '⫸'
+    PREVIOUS = '<<'
+    REFRESH = '♻️ Refresh'
+    NEXT = '>>'
+    TSTATS = '📜 TStats'
     # ---------------------
 
     #STOP_DUPLICATE_MSG: ---> clone.py, aria2_listener.py, task_manager.py
