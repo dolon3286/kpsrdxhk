@@ -6,20 +6,140 @@ from random import choice as rchoice
 from time import time
 from re import match as re_match
 from cryptography.fernet import InvalidToken
+from aiohttp import ClientSession, ClientTimeout, FormData
+from os import path as ospath
+import json
 
 from pyrogram import Client
 from pyrogram.enums import ParseMode
 from pyrogram.types import InputMediaPhoto
 from pyrogram.errors import ReplyMarkupInvalid, FloodWait, PeerIdInvalid, ChannelInvalid, RPCError, UserNotParticipant, MessageNotModified, MessageEmpty, PhotoInvalidDimensions, WebpageCurlFailed, MediaEmpty
 
-from bot import config_dict, user_data, categories_dict, bot_cache, LOGGER, bot_name, status_reply_dict, status_reply_dict_lock, Interval, bot, user, download_dict_lock
+from bot import config_dict, user_data, categories_dict, bot_cache, LOGGER, bot_name, status_reply_dict, status_reply_dict_lock, Interval, bot, user, download_dict_lock, BOT_TOKEN
 from bot.helper.ext_utils.bot_utils import get_readable_message, setInterval, sync_to_async, download_image_url, fetch_user_tds, fetch_user_dumps, new_thread
 from bot.helper.telegram_helper.button_build import ButtonMaker
 from bot.helper.ext_utils.exceptions import TgLinkException
 
 
+def build_bot_api_markup(buttons):
+    if not buttons:
+        return None
+    if hasattr(buttons, 'inline_keyboard'):
+        return {
+            "inline_keyboard": [
+                [
+                    {"text": btn.text, "url": btn.url} if getattr(btn, 'url', None)
+                    else {"text": btn.text, "callback_data": getattr(btn, 'callback_data', '')}
+                    for btn in row
+                ]
+                for row in buttons.inline_keyboard
+            ]
+        }
+    return None
+
+
+async def send_via_bot_api(chat_id, text, buttons=None, reply_to_message_id=None, photo=None):
+    if not BOT_TOKEN:
+        return None
+    if photo == 'IMAGES':
+        photo = rchoice(config_dict['IMAGES']) if config_dict['IMAGES'] else None
+
+    is_photo_url = isinstance(photo, str) and (photo.startswith("http://") or photo.startswith("https://"))
+    is_photo_file = isinstance(photo, str) and ospath.exists(photo)
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto" if (is_photo_url or is_photo_file) else f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    markup = build_bot_api_markup(buttons)
+    try:
+        async with ClientSession() as session:
+            if is_photo_file:
+                form = FormData()
+                form.add_field("chat_id", str(chat_id))
+                form.add_field("caption", text)
+                form.add_field("parse_mode", "HTML")
+                if reply_to_message_id:
+                    form.add_field("reply_to_message_id", str(reply_to_message_id))
+                if markup:
+                    form.add_field("reply_markup", json.dumps(markup))
+                with open(photo, "rb") as f:
+                    form.add_field("photo", f.read(), filename=ospath.basename(photo))
+                resp_ctx = session.post(url, data=form, timeout=ClientTimeout(total=20))
+            else:
+                payload = {
+                    "chat_id": chat_id,
+                    "parse_mode": "HTML",
+                    "disable_notification": True
+                }
+                if is_photo_url:
+                    payload["photo"] = photo
+                    payload["caption"] = text
+                else:
+                    payload["text"] = text
+                    payload["disable_web_page_preview"] = True
+                if reply_to_message_id:
+                    payload["reply_to_message_id"] = reply_to_message_id
+                if markup:
+                    payload["reply_markup"] = markup
+                resp_ctx = session.post(url, json=payload, timeout=ClientTimeout(total=10))
+
+            async with resp_ctx as resp:
+                data = await resp.json()
+                if data.get("ok"):
+                    msg_id = data["result"]["message_id"]
+                    try:
+                        return await bot.get_messages(chat_id, msg_id)
+                    except Exception:
+                        class MockMsg:
+                            def __init__(self, mid, cid, txt):
+                                self.id = mid
+                                class Chat:
+                                    id = cid
+                                self.chat = Chat()
+                                self.text = txt
+                                self.media = None
+                        return MockMsg(msg_id, chat_id, text)
+                else:
+                    LOGGER.warning(f"Bot API {url.rsplit('/', 1)[-1]}: {data.get('description')}")
+    except Exception as e:
+        LOGGER.error(f"send_via_bot_api error: {e}")
+    return None
+
+
+async def edit_via_bot_api(chat_id, message_id, text, buttons=None):
+    if not BOT_TOKEN:
+        return False
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/editMessageText"
+    payload = {
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "text": text,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True
+    }
+    if markup := build_bot_api_markup(buttons):
+        payload["reply_markup"] = markup
+    try:
+        async with ClientSession() as session:
+            async with session.post(url, json=payload, timeout=ClientTimeout(total=10)) as resp:
+                data = await resp.json()
+                if data.get("ok"):
+                    return True
+                desc = data.get("description", "")
+                if "message is not modified" in desc:
+                    return True
+                LOGGER.warning(f"Bot API editMessageText: {desc}")
+    except Exception as e:
+        LOGGER.error(f"edit_via_bot_api error: {e}")
+    return False
+
+
 async def sendMessage(message, text, buttons=None, photo=None, **kwargs):
     try:
+        if "<table" in text and BOT_TOKEN:
+            chat_id = message.chat.id if hasattr(message, 'chat') else message
+            rply_id = message.id if hasattr(message, 'id') else None
+            api_msg = await send_via_bot_api(chat_id, text, buttons, rply_id, photo=photo)
+            if api_msg:
+                return api_msg
         if photo:
             try:
                 if photo == 'IMAGES':
@@ -104,6 +224,11 @@ async def sendMultiMessage(chat_ids, text, buttons=None, photo=None):
         channel_id, *topic_id = channel_id.split(':')
         topic_id = int(topic_id[0]) if len(topic_id) else None
         chat = await chat_info(channel_id)
+        if "<table" in text and BOT_TOKEN:
+            sent = await send_via_bot_api(chat.id, text, buttons=buttons, reply_to_message_id=topic_id, photo=photo)
+            if sent:
+                msg_dict[f"{chat.id}:{topic_id}"] = sent
+                continue
         try:
             if photo:
                 try:
@@ -137,6 +262,11 @@ async def sendMultiMessage(chat_ids, text, buttons=None, photo=None):
 
 async def editMessage(message, text, buttons=None, photo=None):
     try:
+        if "<table" in text and BOT_TOKEN and not message.media:
+            chat_id = message.chat.id if hasattr(message, 'chat') else message
+            msg_id = message.id if hasattr(message, 'id') else None
+            if msg_id and await edit_via_bot_api(chat_id, msg_id, text, buttons):
+                return message
         if message.media:
             if photo:
                 photo = rchoice(config_dict['IMAGES']) if photo == 'IMAGES' else photo
@@ -223,7 +353,9 @@ async def delete_all_messages():
         for key, data in list(status_reply_dict.items()):
             try:
                 del status_reply_dict[key]
-                await deleteMessage(data[0])
+                for m in data[:-1]:
+                    if m:
+                        await deleteMessage(m)
             except Exception as e:
                 LOGGER.error(str(e))
 
@@ -286,42 +418,44 @@ async def get_tg_link_content(link, user_id, decrypter=None):
 
 async def update_all_messages(force=False):
     async with status_reply_dict_lock:
-        if not status_reply_dict or not Interval or (not force and time() - list(status_reply_dict.values())[0][1] < 3):
+        if not status_reply_dict or not Interval or (not force and time() - list(status_reply_dict.values())[0][-1] < 3):
             return
         for chat_id in list(status_reply_dict.keys()):
-            status_reply_dict[chat_id][1] = time()
+            status_reply_dict[chat_id][-1] = time()
     async with download_dict_lock:
-        msg, buttons = await sync_to_async(get_readable_message)
-    if msg is None:
+        res = await sync_to_async(get_readable_message)
+    if res[0] is None:
+        await delete_all_messages()
         return
+    tasks_msg, tasks_btn, stats_msg, stats_btn = res
     async with status_reply_dict_lock:
         for chat_id in list(status_reply_dict.keys()):
-            if status_reply_dict[chat_id] and msg != status_reply_dict[chat_id][0].text:
-                rmsg = await editMessage(status_reply_dict[chat_id][0], msg, buttons, 'IMAGES')
-                if isinstance(rmsg, str) and rmsg.startswith('Telegram says: [400'):
-                    del status_reply_dict[chat_id]
-                    continue
-                status_reply_dict[chat_id][0].text = msg
-                status_reply_dict[chat_id][1] = time()
+            data = status_reply_dict.get(chat_id)
+            if data and len(data) >= 3:
+                task_m, stats_m = data[0], data[1]
+                if task_m:
+                    await editMessage(task_m, tasks_msg, tasks_btn)
+                if stats_m:
+                    await editMessage(stats_m, stats_msg, stats_btn)
+                data[-1] = time()
 
 
 async def sendStatusMessage(msg):
     async with download_dict_lock:
-        progress, buttons = await sync_to_async(get_readable_message)
-    if progress is None:
+        res = await sync_to_async(get_readable_message)
+    if res[0] is None:
         return
+    tasks_msg, tasks_btn, stats_msg, stats_btn = res
     async with status_reply_dict_lock:
         chat_id = msg.chat.id
         if chat_id in list(status_reply_dict.keys()):
-            message = status_reply_dict[chat_id][0]
-            await deleteMessage(message)
+            for m in status_reply_dict[chat_id][:-1]:
+                if m:
+                    await deleteMessage(m)
             del status_reply_dict[chat_id]
-        if message := await sendMessage(msg, progress, buttons, photo='IMAGES'):
-            if hasattr(message, 'caption'):
-                message.caption = progress
-            else:
-                message.text = progress
-        status_reply_dict[chat_id] = [message, time()]
+        task_message = await sendMessage(msg, tasks_msg, tasks_btn)
+        stats_message = await sendMessage(msg, stats_msg, stats_btn)
+        status_reply_dict[chat_id] = [task_message, stats_message, time()]
         if not Interval:
             Interval.append(setInterval(config_dict['STATUS_UPDATE_INTERVAL'], update_all_messages))
     
