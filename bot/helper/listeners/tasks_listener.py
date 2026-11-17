@@ -468,18 +468,22 @@ class MirrorLeechListener:
         user_id = self.message.from_user.id
         name, _ = await format_filename(name, user_id, isMirror=not self.isLeech)
         user_dict = user_data.get(user_id, {})
-        msg = BotTheme('NAME', Name="Task has been Completed!"if config_dict['SAFE_MODE'] and self.isSuperGroup else escape(name))
-        msg += BotTheme('SIZE', Size=get_readable_file_size(size))
-        msg += BotTheme('ELAPSE', Time=get_readable_time(time() - self.message.date.timestamp()))
-        msg += BotTheme('MODE', Mode=self.upload_details['mode'])
+        name_title = "Task has been Completed!" if config_dict['SAFE_MODE'] and self.isSuperGroup else escape(name)
+        msg_header = f"<b>{name_title}</b>\n↬ <b>Task By:</b> {self.tag}\n\n"
         LOGGER.info(f'Task Done: {name}')
         
         buttons = ButtonMaker()
         if self.isLeech:
-            msg += BotTheme('L_TOTAL_FILES', Files=folders)
+            table_rows = [
+                f"<tr><td>↳ Size</td><td>{get_readable_file_size(size)}</td></tr>",
+                f"<tr><td>↳ Elapsed</td><td>{get_readable_time(time() - self.message.date.timestamp())}</td></tr>",
+                f"<tr><td>↳ Mode</td><td>{self.upload_details['mode']}</td></tr>",
+                f"<tr><td>↳ Total Files</td><td>{folders}</td></tr>",
+            ]
             if mime_type != 0:
-                msg += BotTheme('L_CORRUPTED_FILES', Corrupt=mime_type)
-            msg += BotTheme('L_CC', Tag=self.tag)
+                table_rows.append(f"<tr><td>↳ Corrupted Files</td><td>{mime_type}</td></tr>")
+            table_msg = f"<table>\n{''.join(table_rows)}\n</table>\n\n"
+            msg = f"{msg_header}{table_msg}"
             btn_added = False
 
             if not files:
@@ -541,18 +545,26 @@ class MirrorLeechListener:
                 await start_from_queued()
                 return
         else:
-            msg += BotTheme('M_TYPE', Mimetype=mime_type)
+            table_rows = [
+                f"<tr><td>↳ Size</td><td>{get_readable_file_size(size)}</td></tr>",
+                f"<tr><td>↳ Elapsed</td><td>{get_readable_time(time() - self.message.date.timestamp())}</td></tr>",
+                f"<tr><td>↳ Mode</td><td>{self.upload_details['mode']}</td></tr>",
+                f"<tr><td>↳ Type</td><td>{mime_type}</td></tr>",
+            ]
             if mime_type == "Folder":
-                msg += BotTheme('M_SUBFOLD', Folder=folders)
-                msg += BotTheme('TOTAL_FILES', Files=files)
+                table_rows.append(f"<tr><td>↳ SubFolders</td><td>{folders}</td></tr>")
+                table_rows.append(f"<tr><td>↳ Files</td><td>{files}</td></tr>")
+            if rclonePath:
+                table_rows.append(f"<tr><td>↳ Path</td><td><code>{escape(rclonePath)}</code></td></tr>")
+            table_msg = f"<table>\n{''.join(table_rows)}\n</table>\n\n"
+            msg = f"{msg_header}{table_msg}"
+
             if link or rclonePath and config_dict['RCLONE_SERVE_URL'] and not private:
                 if (is_DDL := isinstance(link, dict)):
                     for dlup, dlink in link.items():
                         buttons.ubutton(BotTheme('DDL_LINK', Serv=dlup), dlink)
                 elif link and (user_id == OWNER_ID or not config_dict['DISABLE_DRIVE_LINK']):
-                        buttons.ubutton(BotTheme('CLOUD_LINK'), link)
-                else:
-                    msg += BotTheme('RCPATH', RCpath=rclonePath)
+                    buttons.ubutton(BotTheme('CLOUD_LINK'), link)
                 if rclonePath and (RCLONE_SERVE_URL := config_dict['RCLONE_SERVE_URL']):
                     remote, path = rclonePath.split(':', 1)
                     url_path = rutils.quote(f'{path}')
@@ -573,55 +585,41 @@ class MirrorLeechListener:
                             if mime_type.startswith(('image', 'video', 'audio')):
                                 share_urls = f'{INDEX_URL}/{url_path}?a=view'
                                 buttons.ubutton(BotTheme('VIEW_LINK'), share_urls)
-            else:
-                msg += BotTheme('RCPATH', RCpath=rclonePath)
-            msg += BotTheme('M_CC', Tag=self.tag)
+
+            if self.source_url and config_dict['SOURCE_LINK']:
+                buttons.ubutton(BotTheme('SOURCE_URL'), self.source_url)
+            if config_dict['SAVE_MSG']:
+                buttons.ibutton(BotTheme('SAVE_MSG'), 'save', 'footer')
+            buttons = extra_btns(buttons)[0]
 
             message = msg
             
-            btns = ButtonMaker()
             # <Section : MIRROR LOGS>
             if config_dict['MIRROR_LOG_ID'] and not self.excep_chat:
                 m_btns = deepcopy(buttons)
-                if self.source_url and config_dict['SOURCE_LINK']:
-                    m_btns.ubutton(BotTheme('SOURCE_URL'), self.source_url)
-                if config_dict['SAVE_MSG']:
-                    m_btns.ibutton(BotTheme('SAVE_MSG'), 'save', 'footer')
                 log_msg = list((await sendMultiMessage(config_dict['MIRROR_LOG_ID'], message, m_btns.build_menu(2), self.random_pic)).values())[0]
                 if self.linkslogmsg:
                     dispTime = datetime.now(timezone(config_dict['TIMEZONE'])).strftime('%d/%m/%y, %I:%M:%S %p')
                     _btns = ButtonMaker()
                     if config_dict['SAVE_MSG']:
                         _btns.ibutton(BotTheme('SAVE_MSG'), 'save', 'footer')
+                    _btns = extra_btns(_btns)[0]
                     await editMessage(self.linkslogmsg, (msg + BotTheme('LINKS_SOURCE', On=dispTime, Source=self.source_msg) + BotTheme('L_LL_MSG') + f"\n\n<a href='{log_msg.link}'>{escape(name)}</a>\n"), _btns.build_menu(1))
             
             # <Section : MESSAGE LOGS>
             if self.isPM and self.isSuperGroup:
                 message += BotTheme('M_BOT_MSG')
-            buttons = extra_btns(buttons)[0]
-            btns = extra_btns(btns)[0]
+
             if self.isPM:
                 if self.isSuperGroup:
-                    s_btn = deepcopy(btns) if config_dict['MIRROR_LOG_ID'] else deepcopy(buttons)
-                    if self.source_url and config_dict['SOURCE_LINK']:
-                        buttons.ubutton(BotTheme('SOURCE_URL'), self.source_url)
-                        if not config_dict['SAFE_MODE']:
-                            s_btn.ubutton(BotTheme('SOURCE_URL'), self.source_url)
                     if self.botpmmsg:
-                        await sendMessage(self.botpmmsg, message, buttons.build_menu(2), photo=self.random_pic)
-                        if config_dict['SAVE_MSG']:
-                            s_btn.ibutton(BotTheme('SAVE_MSG'), 'save', 'footer')
-                        s_btn.ibutton(BotTheme('CHECK_PM'), f"kpsmlx {user_id} botpm", 'header')
-                        await sendMessage(self.message, message, s_btn.build_menu(2), photo=self.random_pic)
+                        await sendMessage(self.botpmmsg, msg, buttons.build_menu(2), photo=self.random_pic)
+                    grp_btns = deepcopy(buttons)
+                    grp_btns.ibutton(BotTheme('CHECK_PM'), f"kpsmlx {user_id} botpm", 'header')
+                    await sendMessage(self.message, message, grp_btns.build_menu(2), photo=self.random_pic)
                 else:
-                    if self.source_url and config_dict['SOURCE_LINK']:
-                        buttons.ubutton(BotTheme('SOURCE_URL'), self.source_url)
                     await sendMessage(self.message, message, buttons.build_menu(2), photo=self.random_pic)
             else:
-                if self.source_url and config_dict['SOURCE_LINK'] and (not self.isSuperGroup or not config_dict['SAFE_MODE']):
-                    buttons.ubutton(BotTheme('SOURCE_URL'), self.source_url)
-                if config_dict['SAVE_MSG'] and self.isSuperGroup:
-                    buttons.ibutton(BotTheme('SAVE_MSG'), 'save', 'footer')
                 await sendMessage(self.message, message, buttons.build_menu(2), photo=self.random_pic)
 
             if self.seed:
@@ -670,6 +668,13 @@ class MirrorLeechListener:
 ┠ <b>Due To:</b> {escape(error)}
 ┠ <b>Mode:</b> {self.upload_details['mode']}
 ┖ <b>Elapsed:</b> {get_readable_time(time() - self.message.date.timestamp())}'''
+        if button is None:
+            button = ButtonMaker()
+            button = extra_btns(button)[0]
+            button = button.build_menu(1)
+        elif isinstance(button, ButtonMaker):
+            button = extra_btns(button)[0]
+            button = button.build_menu(1)
         await sendMessage(self.message, msg, button)
         if count == 0:
             await self.clean()
@@ -708,7 +713,9 @@ class MirrorLeechListener:
 ┠ <b>Due To:</b> {escape(error)}
 ┠ <b>Mode:</b> {self.upload_details['mode']}
 ┖ <b>Elapsed:</b> {get_readable_time(time() - self.message.date.timestamp())}'''
-        await sendMessage(self.message, msg)
+        btn = ButtonMaker()
+        btn = extra_btns(btn)[0]
+        await sendMessage(self.message, msg, btn.build_menu(1))
         if count == 0:
             await self.clean()
         else:
